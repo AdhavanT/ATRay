@@ -1,0 +1,10 @@
+#pragma once
+
+//Uncomment to use win32 QueryPerformanceCounter() instead of _rdtsc()
+#define ATP_USE_QPC
+
+//Uncomment to auto turn off ATP on release builds
+//#define ATP_ONLY_ON_DEBUG
+
+//Uncomment to turn off ATP 
+//#define ATP_TURN_OFF
