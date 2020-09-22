@@ -1,10 +1,7 @@
 #pragma once
 
-#ifdef _DEBUG
-#define ASSERT(x) if(!(x)) __debugbreak();
-#else
-#define ASSERT(X)
-#endif 
+#include "platform/platform.h"
+
 
 #include <math.h>
 #include <stdlib.h>	// using rand(). Remove after making own rand()
@@ -497,6 +494,7 @@ struct Mat44
 //----------------------
 //----------------------
 
+
 //----------------------
 // General Math
 //----------------------
@@ -546,6 +544,6 @@ inline f32 rand_uni()
 inline f32 rand_bi()
 {
 	//TODO: change this later to use better random
-	f32 rd =  -1.0f + 2.0f * rand_uni();
+	f32 rd = -1.0f + 2.0f * rand_uni();
 	return rd;
 }

@@ -1,13 +1,17 @@
 #pragma once
 #include "custom headers/types.h"
 #include "custom headers/bitmap.h"
-//#include <corecrt_malloc.h>
-
+#include "custom headers/atp.h"
+#include "platform/platform.h"
 
 struct Camera
 {
+	f32 aspect_ratio;
+	vec3f camera_z, camera_x, camera_y;
+
 	vec3f eye; //position of virtual eye
 	vec3f facing_towards; //direction of camera 
+	vec3f frame_center; //center of camera "sensor"
 
 	b32 toggle_anti_aliasing; //toggles pixel-jittering per sample for anti-aliasing
 	uint32 samples_per_pixel;
@@ -15,6 +19,7 @@ struct Camera
 	f32 h_fov;
 	vec2i resolution;
 
+	f32 half_pixel_width, half_pixel_height;
 };
 
 struct LS_Point
@@ -83,9 +88,26 @@ struct Scene
 
 };
 
-void render_from_camera(Camera& cm, int32 no_of_tiles, Scene& scene, BitmapBuffer& bmb, int32 ray_bounce_limit);
+struct SceneInfo
+{
+	Camera* camera;
+	Scene* scene;
+	BitmapBuffer* bmb;
+	int32 ray_bounce_limit;
+};
 
-void render_tile_from_camera(Camera& cm, Tile& tile_, Scene& scene, BitmapBuffer& bmb, int32 ray_bounce_limit);
 
-//returns color from ray. Ray bounces till ray_bounce_limit
-vec3f cast_ray(Ray& ray, Scene& scene, int32 ray_bounce_limit);
+struct TileWorkQueue
+{
+	SceneInfo info;
+	int64 no_of_tiles;
+	Tile* tiles;
+	volatile int64 current_tile = 0;
+	volatile int64 total_ray_casts = 0;
+};
+
+
+int64 render_from_camera(Camera& cm, Scene& scene, BitmapBuffer& bmb, int32 ray_bounce_limit);
+
+
+vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts);

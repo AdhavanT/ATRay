@@ -4,7 +4,7 @@
 #include <string>
 
 //Making sure to avoid packing. Size should be 14 bytes.
-#pragma pack(push,bfh, 2)
+#pragma pack(push,bfh, 1)
 struct BitmapFileHeader
 {
 	uint8   bitmap_type[2];
