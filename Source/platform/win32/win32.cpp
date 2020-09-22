@@ -1,38 +1,76 @@
 #include "app.h"
 #include "custom headers/bitmap.h"
 #include "custom headers/atp.h"
+#include "platform/platform.h"
 #include <windows.h>
+
+
+uint32 get_core_count()
+{
+	static uint32 core_count = 0;
+	if (core_count == 0)
+	{
+		SYSTEM_INFO sys_info;
+		GetSystemInfo(&sys_info);
+		core_count = sys_info.dwNumberOfProcessors;
+	}
+	return 8;
+}
+
+int64 interlocked_add(volatile int64* data, int64 value)
+{
+	return InterlockedAdd64(data, value);
+}
+
+void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms)
+{
+	WaitForMultipleObjects(no_of_threads, (HANDLE*)handles, TRUE, timeout_in_ms);
+}
+
+
+struct CreateThreadData
+{
+	ThreadProc func_to_be_executed;
+	void* data;
+};
+
+static DWORD WINAPI win32_start_thread(__in LPVOID lpParameter)
+{
+	CreateThreadData *func_pointer_and_data = (CreateThreadData*)lpParameter;
+	func_pointer_and_data->func_to_be_executed(func_pointer_and_data->data);
+	return 0;
+}
+
+ThreadHandle create_thread(ThreadProc proc, void* data)
+{
+	CreateThreadData new_thread_data;
+	new_thread_data.func_to_be_executed = proc;
+	new_thread_data.data = data;
+
+	DWORD thread_id;
+	HANDLE new_thread_handle = CreateThread(0, 0, win32_start_thread, (void*)&new_thread_data, 0, &thread_id);
+	ThreadHandle handle;
+	handle.thread_handle = new_thread_handle;
+	return handle;
+}
+
+int64 interlocked_increment(volatile int64* data)
+{
+	return InterlockedIncrement64(data);
+}
 
 int main()
 {
 	Bitmap bitmap;
 	
-	Setup_Bitmap(bitmap, 1920, 1080);
+	Setup_Bitmap(bitmap, 1280, 720);
 	
-	LARGE_INTEGER start_count, end_count,difference, frequency;
-	f64 time_elapsed_a;
-	
-	
-	QueryPerformanceFrequency(&frequency);
-	QueryPerformanceCounter(&start_count);
 	render_app(bitmap.bitmap_buffer);
-	QueryPerformanceCounter(&end_count);
-	
-
-
-	difference.QuadPart = end_count.QuadPart - start_count.QuadPart;
-	time_elapsed_a = (difference.QuadPart / (double)frequency.QuadPart);
-	
 	
 	ATP::TestType *tt = ATP::lookup_testtype("render_app");
 	f64 time_elapsed = ATP::get_ms_from_test(*tt);
 
-	ATP::TestType* tc = ATP::lookup_testtype("cast_ray");
-	f64 time_elapsed_cr = ATP::get_ms_from_test(*tc);
-
-	printf("	Time Elapsed:actual: %.*f seconds\n", 3, time_elapsed_a );
-	printf("	Time Elapsed:ATP: %.*f seconds\n", 3, time_elapsed / 1000);	  
-	printf("	Time Elapsed:ATP: %.*f ms\n", 9, time_elapsed_cr);
+	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);	  
 
 	Create_BMP_File(bitmap, "Results\\resultings");
-}
+} 

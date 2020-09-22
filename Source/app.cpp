@@ -1,8 +1,6 @@
 #include "app.h"
 #include "custom headers/atp.h"
 
-extern uint64 bounces;
-
 ATP_REGISTER(render_app);
 
 void render_app(BitmapBuffer& bmb)
@@ -18,7 +16,7 @@ void render_app(BitmapBuffer& bmb)
 	cm.resolution.x = bmb.width;
 	cm.resolution.y = bmb.height;
 	cm.toggle_anti_aliasing = true;
-	cm.samples_per_pixel = 16;
+	cm.samples_per_pixel = 128;
 
 	LS_Point lsp[2];
 	Sphere spr[2];
@@ -35,16 +33,11 @@ void render_app(BitmapBuffer& bmb)
 	spr[0].material.color = { 0.1f,0.8f,0.2f };
 	spr[0].material.specularity = 0.4f;
 
-
 	spr[1].center = { 2.f,1.f,-7.f };
 	spr[1].radius = 1.f;
 	spr[1].material.color = { 0.9f,0.4f,0.2f };
-	spr[1].material.specularity = 0.f;
+	spr[1].material.specularity = 0.9f;
 
-	/*spr[2].center = { 2.f,2.5f,-7.5f };
-	spr[2].radius = 1.f;
-	spr[2].material.color = { 0.1f,0.1f,0.9f };
-	spr[2].material.specularity = 1.0f;*/
 
 	pln[0].material.color = { 0.2f, 0.2f,0.2f };
 	pln[0].material.specularity= 0.2f;
@@ -59,13 +52,10 @@ void render_app(BitmapBuffer& bmb)
 	scene.spheres = &spr[0];
 	scene.planes = &pln[0];
 
-	render_from_camera(cm, 3, scene, bmb, 5);
+	int64 rays_shot = render_from_camera(cm, scene, bmb, 5);
 
 	printf("\nCompleted:\n");
-	printf("	Rays shot : % llu\n", ((uint64)cm.resolution.x * (uint64)cm.resolution.y * (uint64)cm.samples_per_pixel));
-	printf("	bounces made: % llu\n", bounces);
-
-
+	printf("\n Total Rays Shot: %I64i\n", rays_shot);
 
 }
 
