@@ -41,6 +41,9 @@ typedef void (*ThreadProc)(void*);
 //creates thread and returns a handle to the thread (only use functions defined in this header to operate on handle)
 ThreadHandle create_thread(ThreadProc proc, void * data);
 
+//release thread handles
+void close_threads(uint32 no_of_threads, const ThreadHandle* handles);
+
 void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms);
 
 //returns resulting incremented value after performing locked increment

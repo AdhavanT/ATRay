@@ -109,5 +109,4 @@ struct TileWorkQueue
 
 int64 render_from_camera(Camera& cm, Scene& scene, BitmapBuffer& bmb, int32 ray_bounce_limit);
 
-
-vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts);
+void prep_scene(Scene);

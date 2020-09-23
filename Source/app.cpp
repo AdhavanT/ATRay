@@ -5,9 +5,9 @@ ATP_REGISTER(render_app);
 
 void render_app(BitmapBuffer& bmb)
 {
-	ATP_BLOCK(render_app);
-
 	printf("\nResolution [%i,%i] - Starting Render...\n", bmb.width, bmb.height);
+	
+	ATP_START(render_app);
 
 	Camera cm;
 	cm.eye = { 0.f,3.f,0.f };
@@ -52,10 +52,20 @@ void render_app(BitmapBuffer& bmb)
 	scene.spheres = &spr[0];
 	scene.planes = &pln[0];
 
+	prep_scene(scene);
+
 	int64 rays_shot = render_from_camera(cm, scene, bmb, 5);
+	
+	ATP_END(render_app);
 
 	printf("\nCompleted:\n");
-	printf("\n Total Rays Shot: %I64i\n", rays_shot);
+	ATP::TestType* tt = ATP::lookup_testtype("render_app");
+	f64 time_elapsed = ATP::get_ms_from_test(*tt);
+
+
+	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);
+	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
+	printf("	Millisecond Per Ray: %.*f seconds\n", 8, time_elapsed / (f64)rays_shot);
 
 }
 

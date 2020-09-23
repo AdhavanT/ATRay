@@ -22,6 +22,14 @@ int64 interlocked_add(volatile int64* data, int64 value)
 	return InterlockedAdd64(data, value);
 }
 
+void close_threads(uint32 no_of_threads, const ThreadHandle* handles)
+{
+	for (uint32 i = 0; i < no_of_threads; i++)
+	{
+		CloseHandle(handles[i].thread_handle);
+	}
+}
+
 void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms)
 {
 	WaitForMultipleObjects(no_of_threads, (HANDLE*)handles, TRUE, timeout_in_ms);
@@ -67,10 +75,5 @@ int main()
 	
 	render_app(bitmap.bitmap_buffer);
 	
-	ATP::TestType *tt = ATP::lookup_testtype("render_app");
-	f64 time_elapsed = ATP::get_ms_from_test(*tt);
-
-	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);	  
-
 	Create_BMP_File(bitmap, "Results\\resultings");
 } 
