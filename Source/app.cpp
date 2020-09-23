@@ -5,7 +5,8 @@ ATP_REGISTER(render_app);
 
 void render_app(BitmapBuffer& bmb)
 {
-	printf("\nResolution [%i,%i] - Starting Render...\n", bmb.width, bmb.height);
+	int32 smp = 128;
+	printf("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",bmb.width, bmb.height, smp);
 	
 	ATP_START(render_app);
 
@@ -16,7 +17,7 @@ void render_app(BitmapBuffer& bmb)
 	cm.resolution.x = bmb.width;
 	cm.resolution.y = bmb.height;
 	cm.toggle_anti_aliasing = true;
-	cm.samples_per_pixel = 128;
+	cm.samples_per_pixel = smp;
 
 	LS_Point lsp[2];
 	Sphere spr[2];
@@ -65,7 +66,7 @@ void render_app(BitmapBuffer& bmb)
 
 	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);
 	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
-	printf("	Millisecond Per Ray: %.*f seconds\n", 8, time_elapsed / (f64)rays_shot);
+	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, time_elapsed / (f64)rays_shot);
 
 }
 

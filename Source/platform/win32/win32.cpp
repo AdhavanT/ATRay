@@ -44,19 +44,20 @@ struct CreateThreadData
 
 static DWORD WINAPI win32_start_thread(__in LPVOID lpParameter)
 {
-	CreateThreadData *func_pointer_and_data = (CreateThreadData*)lpParameter;
-	func_pointer_and_data->func_to_be_executed(func_pointer_and_data->data);
+	CreateThreadData * new_thread_data = (CreateThreadData*)lpParameter;
+	new_thread_data->func_to_be_executed(new_thread_data->data);
+	free(new_thread_data);
 	return 0;
 }
 
 ThreadHandle create_thread(ThreadProc proc, void* data)
 {
-	CreateThreadData new_thread_data;
-	new_thread_data.func_to_be_executed = proc;
-	new_thread_data.data = data;
+	CreateThreadData *new_thread_data = (CreateThreadData*)malloc(sizeof(CreateThreadData));
+	new_thread_data->func_to_be_executed = proc;
+	new_thread_data->data = data;
 
 	DWORD thread_id;
-	HANDLE new_thread_handle = CreateThread(0, 0, win32_start_thread, (void*)&new_thread_data, 0, &thread_id);
+	HANDLE new_thread_handle = CreateThread(0, 0, win32_start_thread, (void*)new_thread_data, 0, &thread_id);
 	ThreadHandle handle;
 	handle.thread_handle = new_thread_handle;
 	return handle;
