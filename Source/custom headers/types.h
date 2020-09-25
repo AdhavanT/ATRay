@@ -1,17 +1,14 @@
 #pragma once
 
 #include "platform/platform.h"
-
-
 #include <math.h>
-#include <stdlib.h>	// using rand(). Remove after making own rand()
 
 // Fundamental Data Types
 
 #define MAX_FLOAT          3.402823466e+38F        // max value
 #define MIN_FLOAT          1.175494351e-38F        // min normalized positive value
 
-#define RAND_MAX		   0x7fff                  // max value rand() from cstd returns
+#define INV_UINT32_MAX	   2.328306437e-10F
 
 typedef signed char        int8;
 typedef short              int16;
@@ -532,18 +529,50 @@ inline vec3b rgb_float_to_byte(vec3f& color)
 	return vec3b((uint8)(color.r * 255.0), (uint8)(color.g * 255.0), (uint8)(color.b * 255.0));
 }
 
-//returns random number between 0 and 1
-inline f32 rand_uni()
+
+struct RNG_Stream
 {
-	//TODO: change this later to use better random
-	f32 rd = rand() / (f32)RAND_MAX;
+	uint64 state;	//Used to keep track of streams position
+	uint64 stream;	//the actual "seed". Determines which stream the RNG uses. 
+					//NOTE: stream must be odd value (sequential streams will produce same result)
+};
+
+#if _MSC_VER > 1800
+#pragma warning(disable:4146)
+#pragma warning(disable:4244)
+#endif
+//implemented from https://www.pcg-random.org/
+inline uint32 random_u32(RNG_Stream* stream)
+{
+	//updating the stream state
+	uint64 oldstate = stream->state;
+	stream->state = oldstate * 6364136223846793005ULL + (stream->stream | 1); //"stream" must be odd value
+	
+	//generating number from stream:
+	uint32 xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u; 
+	uint32 rot = oldstate >> 59u; 
+	return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+}
+#if _MSC_VER > 1800
+#pragma warning(default:4244)  //disables the "loss of data u32 to u64" conversion warning
+#pragma warning(default:4146)  //disables the negation on unsigned int (rot) warning
+#endif
+
+//returns random number between 0 and 1
+inline f32 rand_uni(RNG_Stream* stream)
+{
+	//NOTE: multiplying with 2.328306437e-10F to avoid division (make fast).
+	//		this leads to 1.0f not being achievable
+	f32 rd = (f32)random_u32(stream) * INV_UINT32_MAX;
+
 	return rd;
 }
 
 //returns random number between -1 and 1
-inline f32 rand_bi()
+inline f32 rand_bi(RNG_Stream* stream)
 {
-	//TODO: change this later to use better random
-	f32 rd = -1.0f + 2.0f * rand_uni();
+	//NOTE: rand_uni multiplying with 2.328306437e-10F to avoid division (make fast).
+	//		this leads to 1.0f, 0.0f and -1.0f not being achievable
+	f32 rd = -1.0f + 2.0f * rand_uni(stream);
 	return rd;
 }

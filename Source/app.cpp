@@ -5,7 +5,7 @@ ATP_REGISTER(render_app);
 
 void render_app(BitmapBuffer& bmb)
 {
-	int32 smp = 128;
+	int32 smp = 64;
 	printf("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",bmb.width, bmb.height, smp);
 	
 	ATP_START(render_app);
@@ -70,3 +70,37 @@ void render_app(BitmapBuffer& bmb)
 
 }
 
+
+ATP_REGISTER(PCG_Rand);
+ATP_REGISTER(rand);
+
+void benchmark()
+{
+	RNG_Stream st = { 0,7656776 };
+	f32 thing = 0, thing2 = 0;
+	ATP_START(PCG_Rand);
+	for (int i = 0; i < 10000000; i++)
+	{
+		thing += rand_uni(&st);
+	}
+	ATP_END(PCG_Rand);
+
+	ATP_START(rand);
+	for (int i = 0; i < 10000000; i++)
+	{
+		thing2 += rand() * 0.0000305185f;
+	}
+	ATP_END(rand);
+
+	printf("\nCompleted:\n");
+	ATP::TestType* tt = ATP::lookup_testtype("PCG_Rand");
+	f64 time_elapsed = ATP::get_ms_from_test(*tt);
+
+	ATP::TestType* ts = ATP::lookup_testtype("rand");
+	f64 time_elapseds = ATP::get_ms_from_test(*ts);
+
+
+	printf("	Time Elapsed(ATP->PCG_Rand):%.*f ms, thing:%f\n", 3, time_elapsed, thing / 10000000);
+	printf("	Time Elapsed(ATP->rand):%.*f ms, thing2:%f\n", 3, time_elapseds, thing2 / 10000000);
+
+}
