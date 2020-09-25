@@ -5,9 +5,10 @@ ATP_REGISTER(render_app);
 
 void render_app(BitmapBuffer& bmb)
 {
-	ATP_BLOCK(render_app);
-
-	printf("\nResolution [%i,%i] - Starting Render...\n", bmb.width, bmb.height);
+	int32 smp = 64;
+	printf("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",bmb.width, bmb.height, smp);
+	
+	ATP_START(render_app);
 
 	Camera cm;
 	cm.eye = { 0.f,3.f,0.f };
@@ -16,7 +17,7 @@ void render_app(BitmapBuffer& bmb)
 	cm.resolution.x = bmb.width;
 	cm.resolution.y = bmb.height;
 	cm.toggle_anti_aliasing = true;
-	cm.samples_per_pixel = 128;
+	cm.samples_per_pixel = smp;
 
 	LS_Point lsp[2];
 	Sphere spr[2];
@@ -52,10 +53,54 @@ void render_app(BitmapBuffer& bmb)
 	scene.spheres = &spr[0];
 	scene.planes = &pln[0];
 
+	prep_scene(scene);
+
 	int64 rays_shot = render_from_camera(cm, scene, bmb, 5);
+	
+	ATP_END(render_app);
 
 	printf("\nCompleted:\n");
-	printf("\n Total Rays Shot: %I64i\n", rays_shot);
+	ATP::TestType* tt = ATP::lookup_testtype("render_app");
+	f64 time_elapsed = ATP::get_ms_from_test(*tt);
+
+
+	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);
+	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
+	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, time_elapsed / (f64)rays_shot);
 
 }
 
+
+ATP_REGISTER(PCG_Rand);
+ATP_REGISTER(rand);
+
+void benchmark()
+{
+	RNG_Stream st = { 0,7656776 };
+	f32 thing = 0, thing2 = 0;
+	ATP_START(PCG_Rand);
+	for (int i = 0; i < 10000000; i++)
+	{
+		thing += rand_uni(&st);
+	}
+	ATP_END(PCG_Rand);
+
+	ATP_START(rand);
+	for (int i = 0; i < 10000000; i++)
+	{
+		thing2 += rand() * 0.0000305185f;
+	}
+	ATP_END(rand);
+
+	printf("\nCompleted:\n");
+	ATP::TestType* tt = ATP::lookup_testtype("PCG_Rand");
+	f64 time_elapsed = ATP::get_ms_from_test(*tt);
+
+	ATP::TestType* ts = ATP::lookup_testtype("rand");
+	f64 time_elapseds = ATP::get_ms_from_test(*ts);
+
+
+	printf("	Time Elapsed(ATP->PCG_Rand):%.*f ms, thing:%f\n", 3, time_elapsed, thing / 10000000);
+	printf("	Time Elapsed(ATP->rand):%.*f ms, thing2:%f\n", 3, time_elapseds, thing2 / 10000000);
+
+}

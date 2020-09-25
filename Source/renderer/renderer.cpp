@@ -3,8 +3,10 @@
 
 f32 tolerance = 0.0001f;
 
+vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream* rng_stream);
+
 //renders image only on passed tile 
-static b32 render_tile_from_camera(TileWorkQueue &twq)
+static b32 render_tile_from_camera(TileWorkQueue &twq, RNG_Stream *rng_stream)
 {
 	Tile *tile_;
 	int64 tile_no = interlocked_increment(&twq.current_tile);
@@ -38,11 +40,11 @@ static b32 render_tile_from_camera(TileWorkQueue &twq)
 				vec3f AA_pixel_pos = pixel_pos;
 				for (uint32 i = 0; i < twq.info.camera->samples_per_pixel; i++)
 				{
-					f32 x_off = rand_bi() * twq.info.camera->half_pixel_width + film_x;
-					f32 y_off = rand_bi() * twq.info.camera->half_pixel_height + film_y;
+					f32 x_off = rand_bi(rng_stream) * twq.info.camera->half_pixel_width + film_x;
+					f32 y_off = rand_bi(rng_stream) * twq.info.camera->half_pixel_height + film_y;
 					AA_pixel_pos = twq.info.camera->frame_center + (twq.info.camera->camera_x * x_off) + (twq.info.camera->camera_y * y_off);
 					ray.SetRay(twq.info.camera->eye, AA_pixel_pos);
-					flt_pixel_color += cast_ray(ray, *twq.info.scene, twq.info.ray_bounce_limit, ray_casts);
+					flt_pixel_color += cast_ray(ray, *twq.info.scene, twq.info.ray_bounce_limit, ray_casts, rng_stream);
 				}
 			}
 			else
@@ -51,7 +53,7 @@ static b32 render_tile_from_camera(TileWorkQueue &twq)
 				ray.SetRay(twq.info.camera->eye, pixel_pos);
 				for (uint32 i = 0; i < twq.info.camera->samples_per_pixel; i++)
 				{
-					flt_pixel_color += cast_ray(ray, *twq.info.scene, twq.info.ray_bounce_limit, ray_casts);
+					flt_pixel_color += cast_ray(ray, *twq.info.scene, twq.info.ray_bounce_limit, ray_casts, rng_stream);
 				}
 			}
 			flt_pixel_color = flt_pixel_color / (f32)twq.info.camera->samples_per_pixel;
@@ -68,13 +70,17 @@ static b32 render_tile_from_camera(TileWorkQueue &twq)
 static void start_thread(void* data)
 {
 	TileWorkQueue* twq = (TileWorkQueue*)data;
-	while (render_tile_from_camera(*twq));
+	RNG_Stream rng_stream;
+	rng_stream.state = get_hardware_entropy();
+	rng_stream.stream = (uint64)get_thread_id();
+	while (render_tile_from_camera(*twq, &rng_stream));
 }
 
-TileWorkQueue twq;
 //Divides image into tiles and creates multiple threads to finish all tiles. 
 int64 render_from_camera(Camera& cm, Scene& scene, BitmapBuffer& bmb, int32 ray_bounce_limit)
 {
+	
+	TileWorkQueue twq;
 	
 	cm.aspect_ratio = cm.resolution.x / (f32)cm.resolution.y;
 	normalize(cm.facing_towards);
@@ -93,7 +99,7 @@ int64 render_from_camera(Camera& cm, Scene& scene, BitmapBuffer& bmb, int32 ray_
 	int32 tile_width = bmb.width / get_core_count();	//ASSESS: which tile_width value gives best results
 	int32 tile_height = tile_width;	// for square tiles
 
- 	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= bmb.height);
+ 	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= (int32)bmb.height);
 
 	int32 no_x_tiles = (bmb.width + tile_width - 1) / tile_width;
 	int32 no_y_tiles = (bmb.height + tile_height - 1) / tile_height;
@@ -108,7 +114,6 @@ int64 render_from_camera(Camera& cm, Scene& scene, BitmapBuffer& bmb, int32 ray_
 	twq.tiles = (Tile*)malloc(sizeof(Tile) * total_tiles);
 
 	Tile* tmp = twq.tiles;
-
 
 	//Creates the "tiles" and adds it into a "tile_work_queue"
 	for (int y = 0; y < no_y_tiles; y++)
@@ -141,6 +146,7 @@ int64 render_from_camera(Camera& cm, Scene& scene, BitmapBuffer& bmb, int32 ray_
 	}
 
 	wait_for_all_threads(get_core_count(), threads, INFINITE);
+	close_threads(get_core_count(), threads);
 
 	return twq.total_ray_casts;
 }
@@ -183,50 +189,20 @@ static inline f32 get_sphere_ray_intersection(Ray& ray, Sphere& sphere)
 	
 }
 
-//function that returns a pointer to nearest_sphere (null if none hit) and returns distance from ray
-static inline f32 get_nearest_hit_sphere(Ray& ray,Sphere* spheres, int32 no_of_spheres, Sphere**nearest_sphere)
-{
-	f32 closest = MAX_FLOAT;	//distance to nearest sphere
-	for (int i = 0; i < no_of_spheres; i++)
-	{
-		Sphere* spr = &spheres[i];
-		f32 t = get_sphere_ray_intersection(ray, *spr);
-		if (t > 0 && t < closest)
-		{
-			closest = t;
-			*nearest_sphere = spr;
-		}
-	}
-
-	return closest;
-}
-
 static inline f32 get_plane_ray_intersection( Ray& ray, Plane& plane)
 {
-	vec3f pln_normal_normalized = plane.normal;
-	normalize(pln_normal_normalized);
-	f32 denom = dot(pln_normal_normalized, ray.direction);
+	//assumes plane normal is normalized
+	f32 denom = dot(plane.normal, ray.direction);
 	if (denom > -tolerance && denom < tolerance)
 	{
 		return 0;
 	}
-	f32 t = (-plane.distance - dot(ray.origin, pln_normal_normalized)) / denom;
+	f32 t = (-plane.distance - dot(ray.origin, plane.normal)) / denom;
 	return t;
 }
 
 
-static inline f32 get_luminance_from_light_sources(vec3f& point, vec3f& normal, Scene& scene)
-{
-	LS_Point* lsp = scene.ls_points;
-
-	for (int i = 0; i < scene.no_of_LS_points; i++)
-	{
-
-	}
-}
-
-
-vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts)
+vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
 {
 
 	vec3f skybox_color = { 0.0f,0.2f,0.4f };
@@ -296,12 +272,17 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts)
 	reflected.direction = ray.direction -(hit_normal * (2 * attenuation));
 	normalize(reflected.direction);
 	
-	vec3f color = cast_ray(reflected, scene, bounce_limit - 1, ray_casts) * material->specularity + material->color * (1 - material->specularity);
+	vec3f color = cast_ray(reflected, scene, bounce_limit - 1, ray_casts, rng_stream) * material->specularity + material->color * (1 - material->specularity);
 	color = color * attenuation;
 	//vec3f color = cast_ray(reflected,scene,bounce_no - 1)
 	
-	
-
-
 	return  color;
+}
+
+void prep_scene(Scene scene)
+{
+	for (int32 i = 0; i < scene.no_of_planes; i++)
+	{
+		normalize(scene.planes[i].normal);
+	}
 }

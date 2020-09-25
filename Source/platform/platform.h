@@ -1,5 +1,8 @@
 #pragma once
 
+//This is used as a guide for platform specific code that needs to be implemented 
+//and added at the end.
+
 #ifdef _DEBUG
 #define ASSERT(x) if(!(x)) __debugbreak();
 #else
@@ -41,7 +44,14 @@ typedef void (*ThreadProc)(void*);
 //creates thread and returns a handle to the thread (only use functions defined in this header to operate on handle)
 ThreadHandle create_thread(ThreadProc proc, void * data);
 
+//release thread handles
+void close_threads(uint32 no_of_threads, const ThreadHandle* handles);
+
+//waits for all threads to be released
 void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms);
+
+//gets unique thread id
+uint32 get_thread_id();
 
 //returns resulting incremented value after performing locked increment
 int64 interlocked_increment(volatile int64*);
@@ -51,3 +61,9 @@ int64 interlocked_add(volatile int64*, int64);
 
 //gets number of cpu cores
 uint32 get_core_count();
+
+//gets a random uint64 number from system 
+//NOTE: this entropy may be biased based on how it is implemented
+uint64 get_hardware_entropy();
+
+
