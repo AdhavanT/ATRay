@@ -2,6 +2,8 @@
 #include "custom headers/atp.h"
 
 ATP_REGISTER(render_app);
+ATP_REGISTER(prep_scene);
+ATP_REGISTER(render_from_camera);
 
 void render_app(BitmapBuffer& bmb)
 {
@@ -12,22 +14,22 @@ void render_app(BitmapBuffer& bmb)
 
 	Camera cm;
 	cm.eye = { 0.f,3.f,0.f };
-	cm.facing_towards = { 0.f,-0.3f,-1.f };
+	cm.facing_towards = { 0.f, -0.3f,-1.f };
 	cm.h_fov = 1.f;
 	cm.resolution.x = bmb.width;
 	cm.resolution.y = bmb.height;
 	cm.toggle_anti_aliasing = true;
 	cm.samples_per_pixel = smp;
 
-	LS_Point lsp[2];
 	Sphere spr[2];
 	Plane pln[1];
+	Triangle tri[1];
 
-	lsp[0].position = { -2.f, -2.f, -2.f };
-	lsp[0].color = { 1.f,0.f,0.f };
-
-	lsp[1].position = { 2.f, 1.f, -2.f };
-	lsp[1].color = { 0.f,1.f,0.f };
+	tri[0].a = { -1.0f, -1.0f, -5.0f };
+	tri[0].b = { 1.0f, -1.0f, -5.0f };
+	tri[0].c = { 0.f, 1.0f, -5.0f };
+	tri[0].material.color = { 0,0.8f,0 };
+	tri[0].material.specularity = 0;
 
 	spr[0].center = { 0.f,0.f,-7.f };
 	spr[0].radius = 1.0f;
@@ -46,27 +48,41 @@ void render_app(BitmapBuffer& bmb)
 	pln[0].normal = { 0.f,1.f,0.f };
 
 	Scene scene;
-	scene.no_of_LS_points = ArrayCount(lsp);
+	scene.no_of_triangles = ArrayCount(tri);
 	scene.no_of_planes = ArrayCount(pln);
 	scene.no_of_spheres = ArrayCount(spr);
-	scene.ls_points = &lsp[0];
+	scene.triangles = &tri[0];
 	scene.spheres = &spr[0];
 	scene.planes = &pln[0];
 
-	prep_scene(scene);
-
-	int64 rays_shot = render_from_camera(cm, scene, bmb, 5);
 	
+	ATP_START(prep_scene);
+	prep_scene(scene);
+	ATP_END(prep_scene);
+
+	ATP_START(render_from_camera);
+	int64 rays_shot = render_from_camera(cm, scene, bmb, 5);
+	ATP_END(render_from_camera);
+
 	ATP_END(render_app);
 
 	printf("\nCompleted:\n");
 	ATP::TestType* tt = ATP::lookup_testtype("render_app");
 	f64 time_elapsed = ATP::get_ms_from_test(*tt);
 
+	ATP::TestType* ps = ATP::lookup_testtype("prep_scene");
+	f64 time_elapsed_ps = ATP::get_ms_from_test(*ps);
+
+	ATP::TestType* rc = ATP::lookup_testtype("render_from_camera");
+	f64 time_elapsed_rc = ATP::get_ms_from_test(*rc);
+
 
 	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);
+	printf("	Time Elapsed(ATP->prep_scene):%.*f ms\n", 3, time_elapsed_ps);
+	printf("	Time Elapsed(ATP->render_from_camera):%.*f seconds\n", 3, time_elapsed_rc / 1000);
+
 	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
-	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, time_elapsed / (f64)rays_shot);
+	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, time_elapsed_rc / (f64)rays_shot);
 
 }
 

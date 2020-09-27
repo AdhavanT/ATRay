@@ -60,7 +60,7 @@ struct Material
 {
 	vec3f color;
 	f32 specularity;
-
+	
 };
 
 struct Sphere
@@ -77,8 +77,16 @@ struct Plane
 	Material material;
 };
 
+struct Triangle
+{
+	vec3f a, b, c, normal;
+	Material material;
+};
+
 struct Scene
 {
+	int32 no_of_triangles;
+	Triangle* triangles;
 	int32 no_of_LS_points;
 	LS_Point* ls_points;
 	int32 no_of_spheres;
