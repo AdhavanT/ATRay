@@ -159,6 +159,36 @@ inline vec3f get_reflection(vec3f incident, vec3f normal)
 	return reflection;
 }
 
+//Uses Moller-Trumbore intersection algorithm
+static inline f32 get_triangle_ray_intersection_culled(Ray &ray , Triangle& tri, f32& u, f32& v)
+{
+	vec3f ab, ac;
+	ab = tri.b - tri.a;
+	ac = tri.c - tri.a;
+
+	vec3f pvec = cross(ray.direction, ac);
+	f32 det = dot(ab, pvec);
+
+	//culling ( doesn't intersect if triangle and ray are facing same way)
+	//NOTE: a bit faster as doesn't have to check if fabs(det) < tolerance for no culling
+	if (det < tolerance)
+	{
+		return 0;
+	}
+
+	f32 det_inv = 1 / det;
+
+	vec3f tvec = ray.origin - tri.a;
+	u = dot(tvec, pvec) * det_inv;
+	if (u < 0 || u > 1) return 0;
+
+	vec3f qvec = cross(tvec, ab);
+	v = dot(ray.direction, qvec) * det_inv;
+	if (v < 0 || u + v > 1) return 0;
+
+	return dot(qvec, ac) * det_inv; //t
+
+}
 
 static inline f32 get_sphere_ray_intersection(Ray& ray, Sphere& sphere)
 {
@@ -215,7 +245,21 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 	f32 closest = MAX_FLOAT;
 	Sphere *nearest_sphere = nullptr;
 	Plane *nearest_plane = nullptr;
+	Triangle* nearest_triangle = nullptr;
+	f32 u, v;
 	//Testing for both planes and spheres. (whichever is a closer hit)
+
+	for (int i = 0; i < scene.no_of_triangles; i++)
+	{
+		Triangle* tri = &scene.triangles[i];
+
+		f32 t = get_triangle_ray_intersection_culled(ray,*tri,u,v);
+		if (t > tolerance && t < closest)
+		{
+			closest = t;
+			nearest_triangle = tri;
+		}
+	}
 
 	for (int i = 0; i < scene.no_of_spheres; i++)
 	{
@@ -241,7 +285,7 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 	}
 
 	Ray reflected;
-	Material *material;
+	Material material;
 	reflected.origin = ray.at(closest);
 	vec3f hit_normal;
 
@@ -249,19 +293,25 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 	if (nearest_plane != nullptr)	//nearest hit is a plane
 	{
 		hit_normal = nearest_plane->normal;
-		material = &nearest_plane->material;
+		material = nearest_plane->material;
 	}
 	else if(nearest_sphere != nullptr)	//nearest hit is a sphere
 	{
 		hit_normal = reflected.origin - nearest_sphere->center;
-		material = &nearest_sphere->material;
+		normalize(hit_normal);
+		material = nearest_sphere->material;
+	}
+	//just some code to test if intersection works
+	else if (nearest_triangle != nullptr)	//nearest hit is a triangle
+	{
+		hit_normal = nearest_triangle->normal;
+		material = nearest_triangle->material;
 	}
 	else
 	{
 		return skybox_color;
 	}
 
-	normalize(hit_normal);
 	f32 attenuation = dot(ray.direction, hit_normal);
 	if (attenuation < 0)
 	{
@@ -272,7 +322,7 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 	reflected.direction = ray.direction -(hit_normal * (2 * attenuation));
 	normalize(reflected.direction);
 	
-	vec3f color = cast_ray(reflected, scene, bounce_limit - 1, ray_casts, rng_stream) * material->specularity + material->color * (1 - material->specularity);
+	vec3f color = cast_ray(reflected, scene, bounce_limit - 1, ray_casts, rng_stream) * material.specularity + material.color * (1 - material.specularity);
 	color = color * attenuation;
 	//vec3f color = cast_ray(reflected,scene,bounce_no - 1)
 	
@@ -284,5 +334,13 @@ void prep_scene(Scene scene)
 	for (int32 i = 0; i < scene.no_of_planes; i++)
 	{
 		normalize(scene.planes[i].normal);
+	}
+
+	for (int32 i = 0; i < scene.no_of_triangles; i++)
+	{
+		vec3f ab = scene.triangles[i].a - scene.triangles[i].b;
+		vec3f ac = scene.triangles[i].a - scene.triangles[i].c;
+		scene.triangles[i].normal = cross(ab, ac);
+		normalize(scene.triangles[i].normal);
 	}
 }
