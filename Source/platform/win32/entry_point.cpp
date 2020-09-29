@@ -1,14 +1,13 @@
 #include "app.h"
-#include "custom headers/bitmap.h"
+#include "utilities/texture.h"
 
 int main()
 {
-	Bitmap bitmap;
+	Texture texture;
 
-	Setup_Bitmap(bitmap, 1280, 720);
+	Setup_Texture(texture, TextureFileType::BMP,1920, 1080);
 
-	render_app(bitmap.bitmap_buffer);
-	//benchmark();
+	render_app(texture);
 
-	Create_BMP_File(bitmap, "Results\\resultings");
+	Write_To_File(texture, "Results\\resultings");
 }

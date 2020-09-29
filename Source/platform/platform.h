@@ -1,5 +1,8 @@
 #pragma once
 
+#include <corecrt_malloc.h>	//for malloc and free
+#include <stdio.h>	//for printf()
+
 //This is used as a guide for platform specific code that needs to be implemented 
 //and added at the end.
 
@@ -65,5 +68,3 @@ uint32 get_core_count();
 //gets a random uint64 number from system 
 //NOTE: this entropy may be biased based on how it is implemented
 uint64 get_hardware_entropy();
-
-
