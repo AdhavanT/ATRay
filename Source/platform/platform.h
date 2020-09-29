@@ -59,6 +59,9 @@ uint32 get_thread_id();
 //returns resulting incremented value after performing locked increment
 int64 interlocked_increment(volatile int64*);
 
+//returns resulting decremented value after performing locked decrement
+int64 interlocked_decrement(volatile int64* data);
+
 //performs atomic add and returns result
 int64 interlocked_add(volatile int64*, int64);
 

@@ -4,6 +4,8 @@
 #include "ray.h"
 #include "renderer/renderer.h"
 
+//Camera always faces along -z camera axis
+//this is to consistent with opengl and the "right hand" system 
 struct Camera
 {
 	RenderSettings render_settings;
@@ -20,13 +22,14 @@ struct Camera
 
 static inline void update_camera_pos(Camera& cm, vec3f eye, vec3f facing_towards)
 {
+	cm.eye = eye;
 	normalize(facing_towards);
 	cm.frame_center = cm.eye + facing_towards;
 	cm.camera_z = -facing_towards;
 	vec3f y_axis = { 0.f,1.f,0.f };
-	cm.camera_x = cross(cm.camera_z, y_axis);
+	cm.camera_x = cross(y_axis,cm.camera_z );
 	normalize(cm.camera_x);
-	cm.camera_y = cross(cm.camera_x, cm.camera_z);
+	cm.camera_y = cross( cm.camera_z, cm.camera_x);
 	normalize(cm.camera_y);
 }
 

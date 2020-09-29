@@ -12,6 +12,7 @@ b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 	int64 tile_no = interlocked_increment(&info.twq.current_tile);
 	if (tile_no > info.twq.no_of_tiles)
 	{
+		interlocked_decrement(&info.twq.current_tile);
 		return false;
 	}
 	else
@@ -58,7 +59,6 @@ b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 	}
 
 	interlocked_add(&info.total_ray_casts, ray_casts);
-	printf("\rTiles loaded: %I64i/%I64i", tile_no, info.twq.no_of_tiles);
 
 	return true;
 }
@@ -72,7 +72,10 @@ static void start_thread(void* data)
 	rng_stream.state = get_hardware_entropy();
 	rng_stream.stream = (uint64)get_thread_id();
 
-	while (render_tile_from_camera(*info,&rng_stream));
+	while (render_tile_from_camera(*info, &rng_stream))
+	{
+		printf("\rTiles loaded: %I64i/%I64i", info->twq.current_tile, info->twq.no_of_tiles);
+	}
 }
 
 
@@ -112,7 +115,6 @@ inline vec3f get_reflection(vec3f incident, vec3f normal)
 vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
 {
 
-	vec3f skybox_color = { 0.0f,0.2f,0.4f };
 	if (bounce_limit <= 0)
 	{
 		return {0,0,0};
@@ -194,7 +196,7 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 	}
 	else
 	{
-		return skybox_color;
+		return scene.skybox.color;
 	}
 
 	f32 attenuation = dot(ray.direction, hit_normal);

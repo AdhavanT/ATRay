@@ -33,8 +33,12 @@ uint32 get_core_count()
 	return InterlockedAdd64(data, value);
 }
 
+int64 interlocked_decrement(volatile int64* data)
+{
+	return InterlockedDecrement64(data);
+}
 
- int64 interlocked_increment(volatile int64* data)
+int64 interlocked_increment(volatile int64* data)
 {
 	return InterlockedIncrement64(data);
 }

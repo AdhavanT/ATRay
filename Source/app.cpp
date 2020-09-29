@@ -17,27 +17,26 @@ void render_app(Texture& texture)
 	rs.anti_aliasing = true;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
-	rs.samples_per_pixel = 16;
+	rs.samples_per_pixel = 32;
 	rs.bounce_limit = 5;
 
-	set_camera(cm, { 0.f,3.f,0.f }, { 0.f, 0.0f,-1.f }, rs, 1.0f);
-	
+	set_camera(cm, { 0.f,1.f,0.f }, { 0.f, 0.0f,-1.f }, rs, 1.0f);
 
 	Sphere spr[2];
-	Plane pln[1];
+	Plane pln[2];
 	Model mdl[1];
 	TriangleVertices tri[1];
 
-	tri[0].a = { -3.0f, -3.0f, -5.0f };
-	tri[0].b = { -1.0f, -3.0f, -5.0f };
-	tri[0].c = { -2.f, -1.0f, -5.0f };
+	tri[0].a = { -3.0f, 3.0f, -5.0f };
+	tri[0].b = { -1.0f, 3.0f, -5.0f };
+	tri[0].c = { -2.f, 1.0f, -5.0f };
 	mdl[0].no_of_triangles = ArrayCount(tri);
 	mdl[0].triangles = &tri[0];
 
 	spr[0].center = { 0.f,0.f,-7.f };
 	spr[0].radius = 1.0f;
-	spr[0].material.color = { 0.1f,0.8f,0.2f };
-	spr[0].material.specularity = 0.6f;
+	spr[0].material.color = { 0.f,0.8f,0.9f };
+	spr[0].material.specularity = 0.3f;
 
 	spr[1].center = { 2.f,1.f,-7.f };
 	spr[1].radius = 1.f;
@@ -45,10 +44,16 @@ void render_app(Texture& texture)
 	spr[1].material.specularity = 0.9f;
 
 
-	pln[0].material.color = { 0.9f, 0.8f,0.2f };
-	pln[0].material.specularity= 0.f;
-	pln[0].distance = 0.f;
-	pln[0].normal = { 0.f,1.f,0.f };
+	pln[0].material.color = { 0.2f, 0.3f,0.2f };
+	pln[0].material.specularity = 0.f;
+	pln[0].distance = 7.f;
+	pln[0].normal = { -1.f,0.f,0.f };
+
+	//ground plane
+	pln[1].material.color = { 0.9f, 0.8f,0.2f };
+	pln[1].material.specularity= 0.f;
+	pln[1].distance = 0.5f;
+	pln[1].normal = { 0.f,1.f,0.f };
 
 	Scene scene;
 	scene.no_of_models = ArrayCount(mdl);
@@ -57,6 +62,8 @@ void render_app(Texture& texture)
 	scene.models = &mdl[0];
 	scene.spheres = &spr[0];
 	scene.planes = &pln[0];
+	scene.skybox.specularity = 1.0f;
+	scene.skybox.color = { 0.1f,0.1f,0.1f };
 
 	
 	ATP_START(prep_scene);

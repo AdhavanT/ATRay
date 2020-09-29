@@ -5,6 +5,8 @@
 
 struct Scene
 {
+	Material skybox;
+
 	int32 no_of_models;
 	Model* models;
 

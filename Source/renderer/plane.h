@@ -19,6 +19,6 @@ static inline f32 get_plane_ray_intersection(Ray& ray, Plane& plane)
 	{
 		return 0;
 	}
-	f32 t = (-plane.distance - dot(ray.origin, plane.normal)) / denom;
+	f32 t = (plane.distance - dot(ray.origin, plane.normal)) / denom;
 	return t;
 }
