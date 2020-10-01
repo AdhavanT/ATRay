@@ -8,3 +8,12 @@
 
 //Uncomment to turn off ATP 
 //#define ATP_TURN_OFF
+
+//These can be ignored for normal use
+
+//The initial number of test types allocated (can be a rough estimate of number of test types)
+#define ATP_TESTTYPE_BUFFER_INIT_CAPACITY 5
+
+//Number of test type memory to add onto buffer in case of overflowing ATP_TESTTYPE_BUFFER_INIT_CAPACITY
+#define ATP_TESTTYPE_BUFFER_OVERFLOW_ADDON 5
+

@@ -1,49 +1,80 @@
 #include "atp.h"
 
-
 #ifndef ATP_TURN_OFF
 
 namespace ATP
 {
 
-    TestType* testtype_list_global_front = nullptr;
-    TestType* testtype_list_global_last = nullptr;
-
-    TestType register_testtype(TestType* new_testtype,const char* name_)
+    struct TestType_DBuffer
     {
-        new_testtype->name = name_;
-        if (testtype_list_global_front == nullptr)
+        int32 length;
+        int32 capacity;
+        TestType* front = (TestType*)0;
+       
+        TestType* add(TestType& new_member)
         {
-            testtype_list_global_front = new_testtype;
-            testtype_list_global_last = new_testtype;
-            new_testtype->next_node = nullptr;
+            length++;
+            if (length > capacity)
+            {
+                capacity = capacity + ATP_TESTTYPE_BUFFER_OVERFLOW_ADDON;
+                TestType* temp = (TestType*)ATP_REALLOC(front, capacity * sizeof(TestType));
+                ATP_ASSERT(temp);
+                front = temp;
+            }
+
+            TestType* temp = front;
+            temp = temp + (length - 1);
+            *temp = new_member;
+            return temp;
         }
-        else
+
+        void clear_buffer()
         {
-            testtype_list_global_last->next_node = new_testtype;
-            testtype_list_global_last = new_testtype;
-            new_testtype->next_node = nullptr;
+            length = 0;
+            ATP_FREE(front);
         }
-        return *new_testtype;
+
+        inline TestType& at(int32 index)
+        {
+            ATP_ASSERT(index >= 0 && index < length);
+            return (front[index]);
+        }
+    };
+    
+    //NOTE: This is a pointer that is dynamically allocated cause it'll be zeroed out on dynamic initillization
+    //that happens before main and after all testtypes register themselves if it's a normal global variable
+    TestType_DBuffer *global_testtypes;
+
+    TestType* register_testtype(const char* name_)
+    {
+        if (global_testtypes == (TestType_DBuffer*)0)
+        {
+            global_testtypes = (TestType_DBuffer*)ATP_CALLOC(1, sizeof(TestType_DBuffer));      //creating the global_testtypes buffer to avoid zero-initilization from Ordered dynamic initialization
+        }
+        TestType test_type;
+        test_type.hits = 0; 
+        test_type.info = { 0 };
+        test_type.name = name_;
+        if (global_testtypes->front == (TestType*)0) //If buffer is not initilized yet
+        {
+            global_testtypes->length = 0;
+            global_testtypes->capacity = ATP_TESTTYPE_BUFFER_INIT_CAPACITY;
+            global_testtypes->front = (TestType*)ATP_CALLOC(global_testtypes->capacity, sizeof(TestType));
+        }
+        return global_testtypes->add(test_type);
     }
 
     
     TestType* lookup_testtype(const char* name)
     {
-        TestType *tmp = testtype_list_global_front;
-        while (name != tmp->name)
+        for (int i = 0; i < global_testtypes->length; i++)
         {
-            tmp = tmp->next_node;
+            if (name == global_testtypes->at(i).name)
+            {
+                return &global_testtypes->at(i);
+            }
         }
-        if (tmp == nullptr)
-        {
-            ATP_ASSERT(false);
-            return nullptr;
-        }
-        else
-        {
-            return tmp;
-        }
+        return 0;
     }
     f64 get_ms_from_test(TestType& test)
     {
@@ -59,9 +90,7 @@ namespace ATP
 #ifdef ATP_TURN_OFF
 namespace ATP
 {
-    TestType* testtype_list_global_front = nullptr;
-    TestType* testtype_list_global_last = nullptr;
-    
+ 
     TestType* lookup_testtype(const char* name)
     {
         return nullptr;

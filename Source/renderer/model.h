@@ -11,9 +11,9 @@ struct TriangleVertices
 
 struct Model
 {	
-	int32 no_of_triangles;
-	TriangleVertices* triangles;
+	DBuffer<TriangleVertices, 100,100> triangles;
 };
+
 
 //Uses Moller-Trumbore intersection algorithm
 static inline f32 get_triangle_ray_intersection_culled(Ray& ray, TriangleVertices& tri, f32& u, f32& v)

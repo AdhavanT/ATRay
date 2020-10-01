@@ -7,13 +7,11 @@ struct Scene
 {
 	Material skybox;
 
-	int32 no_of_models;
-	Model* models;
+	DBuffer<Model> models;
 
-	int32 no_of_spheres;
-	Sphere* spheres;
+	DBuffer<Sphere> spheres;
 
-	int32 no_of_planes;
-	Plane* planes;
-
+	DBuffer<Plane> planes;
 };
+
+void init_scene(Scene& scene);

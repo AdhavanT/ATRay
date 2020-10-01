@@ -66,28 +66,26 @@ inline T sqr(T n)
 // Collections
 //----------------------
 // DYNAMIC BUFFER
-template<typename t>
+template<typename t, int32 capacity_ = 1,int32 overflow_ = 5>
 struct DBuffer
 {
-	int32 length;
-	int32 capacity;
-	int32 overflow_addon;
-	t* front;
-	void init(int32 _object_buffer_capacity, int32 _overflow_addon)
-	{
-		overflow_addon = _overflow_addon;
-		capacity = _object_buffer_capacity;
-		length = 0;
-		front = (t*)malloc(_object_buffer_capacity * sizeof(t));
-	}
-	void add(t new_member)
+	int32 length = 0;
+	int32 capacity = capacity_;
+	int32 overflow_addon = overflow_;
+	t* front = 0;
+	
+	inline void add(t new_member)
 	{
 		length++;
-		if (length >= capacity)
+		if (front == 0)		//Buffer was not initilized and is being initialized here. 
+		{
+			front = (t*)calloc(capacity , sizeof(t));
+		}
+		if (length > capacity)
 		{
 			capacity = capacity + overflow_addon;
 			t* temp = (t*)realloc(front, capacity * sizeof(t));
-			ASSERT(temp);
+			ASSERT(temp);	//Not enough memory to realloc, or buffer was never initialized and realloc is trying to allocate to null pointer
 			front = temp;
 		}
 
@@ -99,13 +97,13 @@ struct DBuffer
 	void clear_buffer()
 	{
 		length = 0;
-		delete[] front;
+		free(front);
 	}
 
-	inline t* operator [](int32 index)
+	inline t& operator [](int32 index)
 	{
 		ASSERT(index >= 0 && index < length);
-		return (front + index);
+		return (front[index]);
 	}
 };
 

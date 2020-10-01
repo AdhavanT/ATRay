@@ -26,7 +26,7 @@ struct RenderInfo
 
 	Camera* camera;
 	Scene* scene;
-	Texture* tex;
+	Texture* camera_tex;
 
 	volatile int64 total_ray_casts = 0;
 };

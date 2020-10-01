@@ -54,7 +54,7 @@ b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 			}
 			flt_pixel_color = flt_pixel_color / (f32)info.camera->render_settings.samples_per_pixel;
 			pixel_color = rgb_float_to_byte(flt_pixel_color);
-			Set_Pixel(pixel_color,*info.tex, x, y);
+			Set_Pixel(pixel_color,*info.camera_tex, x, y);
 		}
 	}
 
@@ -83,7 +83,7 @@ static void start_thread(void* data)
 int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex)
 {
 	RenderInfo info;
-	info.tex = &tex;
+	info.camera_tex = &tex;
 	info.camera = &cm;
 	info.scene = &scene;
 	create_tile_work_queue(info.twq,tex);
@@ -127,9 +127,9 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 	TriangleVertices* nearest_triangle = nullptr;
 	f32 u, v;
 
-	for (int i = 0; i < scene.no_of_models; i++)
+	for (int i = 0; i < scene.models.length; i++)
 	{
-		for (int j = 0; j < scene.models[i].no_of_triangles; j++)
+		for (int j = 0; j < scene.models[i].triangles.length; j++)
 		{
 			TriangleVertices* tri = &scene.models[i].triangles[j];
 
@@ -143,7 +143,7 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 
 	}
 
-	for (int i = 0; i < scene.no_of_spheres; i++)
+	for (int i = 0; i < scene.spheres.length; i++)
 	{
 		Sphere* spr = &scene.spheres[i];
 
@@ -154,7 +154,7 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 			nearest_sphere = spr;
 		}
 	}
-	for (int i = 0; i < scene.no_of_planes; i++)
+	for (int i = 0; i < scene.planes.length; i++)
 	{
 		Plane* pln = &scene.planes[i];
 
@@ -218,7 +218,7 @@ vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG
 
 void prep_scene(Scene scene)
 {
-	for (int32 i = 0; i < scene.no_of_planes; i++)
+	for (int32 i = 0; i < scene.planes.length; i++)
 	{
 		normalize(scene.planes[i].normal);
 	}
