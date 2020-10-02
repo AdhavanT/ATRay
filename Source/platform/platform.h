@@ -6,7 +6,7 @@
 //This is used as a guide for platform specific code that needs to be implemented 
 //and added at the end.
 
-#ifdef _DEBUG
+#ifndef RELEASE
 #define ASSERT(x) if(!(x)) __debugbreak();
 #else
 #define ASSERT(X)
@@ -31,17 +31,15 @@ typedef double f64;
 
 
 //-----------platform specific------------------
-//These structs need to be redefined or reassessed on platform change 
-//as their definition contains platform specific objects
 
+//------------------------------------------<THREADING>--------------------------------------------
+//Data for a handle to a thread
 struct ThreadHandle
 {
 	void* thread_handle;
 };
 
-//----------------------------------------------
-
-
+//What a thread callback function looks like
 typedef void (*ThreadProc)(void*);
 
 //creates thread and returns a handle to the thread (only use functions defined in this header to operate on handle)
@@ -71,3 +69,20 @@ uint32 get_core_count();
 //gets a random uint64 number from system 
 //NOTE: this entropy may be biased based on how it is implemented
 uint64 get_hardware_entropy();
+//------------------------------------------</THREADING>--------------------------------------------
+
+//--------------------------------------<FILE I/O>------------------------------------
+//Opens a file of location "path" into *file. type can be "r" to open for reading, "rb" reading for binary,(standard C file io types) etc...
+b32 file_open(void** file, const char* path, const char* type);
+
+//Closes a file handle. Returns true if successful. 
+b32 file_close(void* file);
+
+//Will try to load the file into a memory block. Returns number of bytes read.
+//(check if returned and bytes_to_read are equal to check for success) 
+uint32 load_from_file(void* file, uint32 bytes_to_read, void* block_to_store);
+
+uint32 get_file_size(void* file);
+
+//--------------------------------------</FILE I/O>------------------------------------
+

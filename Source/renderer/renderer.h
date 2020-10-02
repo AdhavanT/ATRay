@@ -32,8 +32,6 @@ struct RenderInfo
 };
 
 
-
-
 int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex);
 
 void prep_scene(Scene);

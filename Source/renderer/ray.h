@@ -11,7 +11,7 @@ struct Ray
 	}
 };
 
-inline void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
+static inline void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
 {
 	ray.origin = origin_;
 	ray.direction = towards_ - origin_;

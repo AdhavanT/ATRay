@@ -1,15 +1,37 @@
 #include "app.h"
 #include "utilities/atp.h"
+#include "utilities/fileio.h"
+
 
 ATP_REGISTER(render_app);
 
 ATP_REGISTER(prep_scene);
 ATP_REGISTER(render_from_camera);
 
+//TODO: Load and parse the Deer.obj file. 
+void load_model(Model& mdl, const char* file_name)
+{
+	void* file = nullptr;
+	b32 opened = file_open(&file,file_name, "rb");
+
+	ASSERT(opened);	//Can't load file.
+	
+	uint32 file_size = get_file_size(file);
+
+	char* buffer = (char*)malloc(file_size);
+
+	uint8 file_load = load_from_file(file, file_size, buffer);
+
+	b32 closed = file_close(file);
+	ASSERT(closed);	//Can't close file
+}
 
 void render_app(Texture& texture)
 {
 	
+	Model mdl_loaded;
+	load_model(mdl_loaded,"Assets\\Simple.obj");
+
 	ATP_START(render_app);
 
 	Camera cm;

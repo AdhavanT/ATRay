@@ -83,3 +83,45 @@ static DWORD WINAPI win32_start_thread(__in LPVOID lpParameter)
 	handle.thread_handle = new_thread_handle;
 	return handle;
 }
+
+ b32 file_open(void** file, const char* path, const char* type)
+ {
+	 errno_t error = fopen_s((FILE**)file, path, type);
+	 if (error == 0)
+	 {
+		 return true;
+	 }
+	 else
+	 {
+		 return false;
+	 }
+ }
+
+ b32 file_close(void* file)
+ {
+	 b32 result = fclose((FILE*)file);
+	 if (result == 0)
+	 {
+		 return true;
+	 }
+	 else
+	 {
+		 return false;
+	 }
+ }
+
+ uint32 load_from_file(void* file, uint32 bytes_to_read, void* block_to_store)
+ {
+	 return fread(block_to_store, 1, bytes_to_read, (FILE*)file);
+ }
+
+ uint32 get_file_size(void* file)
+ {
+	 uint32 current_pos, end;
+	 current_pos = ftell((FILE*)file);
+	 fseek((FILE*)file, 0, SEEK_END);
+	 end = ftell((FILE*)file);
+	 fseek((FILE*)file, current_pos, SEEK_SET);
+
+	 return end;
+ }

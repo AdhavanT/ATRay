@@ -2,6 +2,7 @@
 #define ATP_HEADER_IS_INCLUDED
 
 #define ATP_USE_CONFIG
+
 /*
 TODO for anyone: This Library doesn't use any C++ features (mostly just syntax) and can easily be ported to C.
           
@@ -190,11 +191,30 @@ namespace ATP
         #define ATP_BLOCK(name) \
         ATP::ATP_SCOPED_TIMER_BLOCK ATP_SCOPED_TIMER_##name(name##ATPTEST)
 #else
-    #define ATP_REGISTER(name)
-    #define ATP_EXTERN_REGISTER(name)
-    #define ATP_START(name)
-    #define ATP_END(name)
-    #define ATP_BLOCK(name)
+    #define ATP_REGISTER(name)              //Use to Register a TestType. Place in global scope.
+    #define ATP_EXTERN_REGISTER(name)       //Use to Call a TestType registered in a different compilation unit
+    #define ATP_START(name)                 //Use to start timer 
+    #define ATP_END(name)                   //Use to end timer and register timer info
+    #define ATP_BLOCK(name)                 //Scoped ATP_START() and ATP_END() block
 #endif
 
+
+#ifndef ATP_IS_IMPLEMENTATION
+
+//Removing libraries macros 
+#undef ATP_REALLOC 
+#undef ATP_CALLOC 
+#undef ATP_FREE 
+#undef ATP_TESTTYPE_BUFFER_INIT_CAPACITY 
+#undef ATP_TESTTYPE_BUFFER_INIT_OVERFLOW_ADDON 
+#undef ATP_USE_QPC
+#undef ATP_ONLY_ON_DEBUG
+#undef ATP_TURN_OFF
+#undef ATP_ASSERT 
+
+#ifdef _WIN32
+#undef WIN32_LEAN_AND_MEAN
+#undef ATP_USE_QPC
+#endif
+#endif
 #endif // !ATP_HEADER_IS_INCLUDED

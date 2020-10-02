@@ -6,7 +6,7 @@ f32 tolerance = 0.0001f;
 vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream* rng_stream);
 
 
-b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
+static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 {
 	Tile* tile_;
 	int64 tile_no = interlocked_increment(&info.twq.current_tile);
@@ -112,7 +112,7 @@ inline vec3f get_reflection(vec3f incident, vec3f normal)
 }
 
 
-vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
+static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
 {
 
 	if (bounce_limit <= 0)

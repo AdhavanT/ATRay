@@ -1,3 +1,4 @@
+#define ATP_IS_IMPLEMENTATION
 #include "atp.h"
 
 #ifndef ATP_TURN_OFF
@@ -10,7 +11,7 @@ namespace ATP
         int32 length;
         int32 capacity;
         TestType* front = (TestType*)0;
-       
+
         TestType* add(TestType& new_member)
         {
             length++;
@@ -40,10 +41,10 @@ namespace ATP
             return (front[index]);
         }
     };
-    
+
     //NOTE: This is a pointer that is dynamically allocated cause it'll be zeroed out on dynamic initillization
     //that happens before main and after all testtypes register themselves if it's a normal global variable
-    TestType_DBuffer *global_testtypes;
+    TestType_DBuffer* global_testtypes;
 
     TestType* register_testtype(const char* name_)
     {
@@ -52,7 +53,7 @@ namespace ATP
             global_testtypes = (TestType_DBuffer*)ATP_CALLOC(1, sizeof(TestType_DBuffer));      //creating the global_testtypes buffer to avoid zero-initilization from Ordered dynamic initialization
         }
         TestType test_type;
-        test_type.hits = 0; 
+        test_type.hits = 0;
         test_type.info = { 0 };
         test_type.name = name_;
         if (global_testtypes->front == (TestType*)0) //If buffer is not initilized yet
@@ -64,7 +65,7 @@ namespace ATP
         return global_testtypes->add(test_type);
     }
 
-    
+
     TestType* lookup_testtype(const char* name)
     {
         for (int i = 0; i < global_testtypes->length; i++)
@@ -81,7 +82,7 @@ namespace ATP
         LARGE_INTEGER frequency;
         QueryPerformanceFrequency(&frequency);
 
-        f64 time_elapsed = (test.info.test_run_cycles * 1000  / (f64)frequency.QuadPart) ;
+        f64 time_elapsed = (test.info.test_run_cycles * 1000 / (f64)frequency.QuadPart);
         return time_elapsed;
     }
 }
@@ -90,7 +91,7 @@ namespace ATP
 #ifdef ATP_TURN_OFF
 namespace ATP
 {
- 
+
     TestType* lookup_testtype(const char* name)
     {
         return nullptr;

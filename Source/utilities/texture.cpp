@@ -1,5 +1,4 @@
 #include "texture.h"
-#define _CRT_SECURE_NO_DEPRECATE 
 #include <cstdio>
 #include <string>
 
@@ -134,7 +133,7 @@ namespace BMP_FILE_FORMAT
 	}*/
 }
 
-bool Setup_Texture(Texture& tex, TextureFileType file_type, uint32 width, uint32 height)
+ bool Setup_Texture(Texture& tex, TextureFileType file_type, uint32 width, uint32 height)
 {
 	tex.file_type = file_type;
 	if (tex.file_type == TextureFileType::BMP)
@@ -149,7 +148,7 @@ bool Setup_Texture(Texture& tex, TextureFileType file_type, uint32 width, uint32
 	}
 }
 
-bool Write_To_File(Texture& tex, const char* file_name)
+ bool Write_To_File(Texture& tex, const char* file_name)
 {
 	if (tex.file_type == TextureFileType::BMP)
 	{
