@@ -10,14 +10,14 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 {
 	Tile* tile_;
 	int64 tile_no = interlocked_increment(&info.twq.current_tile);
-	if (tile_no > info.twq.no_of_tiles)
+	if (tile_no > info.twq.tiles.size)
 	{
 		interlocked_decrement(&info.twq.current_tile);
 		return false;
 	}
 	else
 	{
-		tile_ = info.twq.tiles + tile_no - 1;
+		tile_ = info.twq.tiles.front + tile_no - 1;
 	}
 
 	vec3f pixel_pos;
@@ -74,7 +74,7 @@ static void start_thread(void* data)
 
 	while (render_tile_from_camera(*info, &rng_stream))
 	{
-		printf("\rTiles loaded: %I64i/%I64i", info->twq.current_tile, info->twq.no_of_tiles);
+		printf("\rTiles loaded: %I64i/%i", info->twq.current_tile, info->twq.tiles.size);
 	}
 }
 
@@ -88,15 +88,15 @@ int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex)
 	info.scene = &scene;
 	create_tile_work_queue(info.twq,tex);
 
-
-	ThreadHandle* threads = (ThreadHandle*)malloc(sizeof(ThreadHandle) *cm.render_settings.no_of_threads);
-	for (uint32 i = 0; i < cm.render_settings.no_of_threads; i++)
+	FDBuffer<ThreadHandle> threads;
+	threads.init(cm.render_settings.no_of_threads);
+	for (int32 i = 0; i < threads.size; i++)
 	{
 		threads[i] = create_thread(start_thread, &info);
 	}
 
-	wait_for_all_threads(cm.render_settings.no_of_threads, threads, INFINITE);
-	close_threads(cm.render_settings.no_of_threads, threads);
+	wait_for_all_threads(cm.render_settings.no_of_threads, threads.front, INFINITE);
+	close_threads(cm.render_settings.no_of_threads, threads.front);
 
 	free_tile_work_queue(info.twq);
 

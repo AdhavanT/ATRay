@@ -13,12 +13,8 @@ void create_tile_work_queue(TileWorkQueue& twq, Texture& tex)
 
 	int32 total_tiles = no_y_tiles * no_x_tiles;
 
-	twq.no_of_tiles = total_tiles;
-	twq.tiles = (Tile*)malloc(sizeof(Tile) * total_tiles);
+	Tile* tmp = twq.tiles.init(total_tiles);
 	twq.current_tile = 0;
-
-
-	Tile* tmp = twq.tiles;
 
 	//Creates the "tiles" and adds it into a "tile_work_queue"
 	for (int y = 0; y < no_y_tiles; y++)
@@ -40,15 +36,12 @@ void create_tile_work_queue(TileWorkQueue& twq, Texture& tex)
 			}
 			tmp->left_top = { (int32)minx, (int32)miny };
 			tmp->right_bottom = { (int32)maxx, (int32)maxy };
-			tmp = tmp++;
+			tmp++;
 		}
 	}
 }
 
 void free_tile_work_queue(TileWorkQueue& twq)
 {
-	if (twq.tiles)
-	{
-		free(twq.tiles);
-	}
+	twq.tiles.clear();
 }

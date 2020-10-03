@@ -8,6 +8,30 @@ ATP_REGISTER(render_app);
 ATP_REGISTER(prep_scene);
 ATP_REGISTER(render_from_camera);
 
+//ASSESS: How I wanna store a "Face" and whether I want to parse the model like this and do pre-processing later
+struct Model_Face
+{
+	int32 vertices[3];
+	int32 vertex_normals[3];
+	int32 texture_coords[3];
+};
+
+struct OBJ_Model_Load_Data
+{
+	DBuffer<vec3f,50,100> vertices;
+	DBuffer<vec3f,50,100> normals;
+	DBuffer<Model_Face,20,50> faces;
+};
+
+struct ParseDataChunk
+{
+	int32 chunk_size;
+	char* start;
+	char* end;
+
+	OBJ_Model_Load_Data chunk_data;
+};
+
 //TODO: Load and parse the Deer.obj file. 
 void load_model(Model& mdl, const char* file_name)
 {
@@ -18,19 +42,51 @@ void load_model(Model& mdl, const char* file_name)
 	
 	uint32 file_size = get_file_size(file);
 
-	char* buffer = (char*)malloc(file_size);
+	int32 no_of_chunks = get_core_count();
 
-	uint8 file_load = load_from_file(file, file_size, buffer);
+	char* buffer_front = (char*)malloc(file_size);
+
+	uint8 file_load = load_from_file(file, file_size, buffer_front);
+
+	int32 general_chunk_size = file_size + (no_of_chunks - 1) / no_of_chunks;
+	FDBuffer<ParseDataChunk>chunks;
+	ParseDataChunk* chunk = chunks.init(no_of_chunks);
+
+	char* ptr = buffer_front;
+	char* file_end = (buffer_front + (file_size - 1));
+	while (ptr < file_end)
+	{
+		uint32 cursor = 0;
+		chunk->start = ptr;
+		cursor += general_chunk_size;
+		if ((ptr + cursor) > file_end)
+		{
+			cursor = file_end - ptr;
+		}
+		else
+		{
+			while (*(ptr + cursor) != '\n')
+			{
+				cursor++;
+			}
+		}
+		ptr += cursor;
+		chunk->chunk_size = cursor;
+		chunk->end = ptr;
+		ptr++;
+	}
 
 	b32 closed = file_close(file);
 	ASSERT(closed);	//Can't close file
 }
 
+void print_out_tests();
+
 void render_app(Texture& texture)
 {
 	
 	Model mdl_loaded;
-	load_model(mdl_loaded,"Assets\\Simple.obj");
+	load_model(mdl_loaded,"Assets\\Deer.obj");
 
 	ATP_START(render_app);
 
@@ -104,21 +160,21 @@ void render_app(Texture& texture)
 	ATP_END(render_app);
 
 	printf("\nCompleted:\n");
-	ATP::TestType* tt = ATP::lookup_testtype("render_app");
-	f64 time_elapsed = ATP::get_ms_from_test(*tt);
-
-	ATP::TestType* ps = ATP::lookup_testtype("prep_scene");
-	f64 time_elapsed_ps = ATP::get_ms_from_test(*ps);
-
-	ATP::TestType* rc = ATP::lookup_testtype("render_from_camera");
-	f64 time_elapsed_rc = ATP::get_ms_from_test(*rc);
-
-
-	printf("	Time Elapsed(ATP->render_app):%.*f seconds\n", 3, time_elapsed / 1000);
-	printf("	Time Elapsed(ATP->prep_scene):%.*f ms\n", 3, time_elapsed_ps);
-	printf("	Time Elapsed(ATP->render_from_camera):%.*f seconds\n", 3, time_elapsed_rc / 1000);
-
+	
+	print_out_tests();
+	
 	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
-	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, time_elapsed_rc / (f64)rays_shot);
+	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)rays_shot);
 
+}
+
+void print_out_tests()
+{
+	int32 length;
+	ATP::TestType* front = ATP::get_testtype_registry(length);
+	for (int i = 0; i < length; i++)
+	{
+		printf("	Time Elapsed(ATP->%s):%.*f ms\n",front->name,3, ATP::get_ms_from_test(*front));
+		front++;
+	}
 }

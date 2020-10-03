@@ -66,12 +66,12 @@ inline T sqr(T n)
 // Collections
 //----------------------
 // DYNAMIC BUFFER
-template<typename t, int32 capacity_ = 1,int32 overflow_ = 5>
+template<typename t, int32 capacity__ = 1,int32 overflow__ = 5>
 struct DBuffer
 {
 	int32 length = 0;
-	int32 capacity = capacity_;
-	int32 overflow_addon = overflow_;
+	int32 capacity = capacity__;
+	int32 overflow_addon = overflow__;
 	t* front = 0;
 	
 	inline void add(t new_member)
@@ -94,7 +94,29 @@ struct DBuffer
 		*temp = new_member;
 	}
 
-	void clear_buffer()
+	//Same as add but doesn't perform copy. (Use for BIG objects)
+	inline void add_nocpy(t &new_member)
+	{
+		length++;
+		if (front == 0)		//Buffer was not initilized and is being initialized here. 
+		{
+			front = (t*)calloc(capacity, sizeof(t));
+		}
+		if (length > capacity)
+		{
+			capacity = capacity + overflow_addon;
+			t* temp = (t*)realloc(front, capacity * sizeof(t));
+			ASSERT(temp);	//Not enough memory to realloc, or buffer was never initialized and realloc is trying to allocate to null pointer
+			front = temp;
+		}
+
+		t* temp = front;
+		temp = temp + (length - 1);
+		*temp = new_member;
+	}
+
+	//Clears memory and resets length.
+	inline void clear_buffer()
 	{
 		length = 0;
 		free(front);
@@ -103,6 +125,32 @@ struct DBuffer
 	inline t& operator [](int32 index)
 	{
 		ASSERT(index >= 0 && index < length);
+		return (front[index]);
+	}
+};
+
+// FIXED DYNAMIC BUFFER
+//A wrapper for a non-resizable dynamic buffer 
+template<typename t, typename size_type = int32>
+struct FDBuffer
+{
+	size_type size;
+	t* front = 0;
+
+	inline t* init(int32 size_)
+	{
+		size = size_;
+		front = (t*)calloc(size, sizeof(t));
+		return front;
+	}
+	inline void clear()
+	{
+		size = 0;
+		free(front);
+	}
+	inline t& operator [](int32 index)
+	{
+		ASSERT(index >= 0 && index < size);
 		return (front[index]);
 	}
 };

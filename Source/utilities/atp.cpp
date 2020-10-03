@@ -66,6 +66,12 @@ namespace ATP
     }
 
 
+    TestType* get_testtype_registry(int32& no_of_testtypes)
+    {
+        no_of_testtypes = global_testtypes->length;
+        return global_testtypes->front;
+    }
+
     TestType* lookup_testtype(const char* name)
     {
         for (int i = 0; i < global_testtypes->length; i++)

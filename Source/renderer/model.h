@@ -9,9 +9,10 @@ struct TriangleVertices
 	vec3f a, b, c;
 };
 
+
 struct Model
 {	
-	DBuffer<TriangleVertices, 100,100> triangles;
+	DBuffer<TriangleVertices, 20,100> triangles;
 };
 
 

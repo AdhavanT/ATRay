@@ -105,13 +105,16 @@ namespace ATP
 }
 namespace ATP
 {
-    TestType* register_testtype( const char* name_);
+
+    TestType* get_testtype_registry(int32& no_of_testtypes);
 
     //that allows easy flushing of memory if not ATP_RECORD_ALL
     TestType* lookup_testtype(const char* name);
 
     //TODO: Agian, do this properly
     f64 get_ms_from_test(TestType &test);
+    
+    TestType* register_testtype( const char* name_);
 }
 
 #ifndef ATP_TURN_OFF

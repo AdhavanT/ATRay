@@ -98,9 +98,9 @@ static inline char* parse_uint(char* from, uint64& val)
 
 //ASSESS: Whether this method of parsing fractional part and whole number part into uint64s, then casting them into a f64 loses more precision than normal.
 //parses a float into val, reading from *from onwards and returns buffer position after parsing
-static inline char* parse_float(char* from, f32& val)
+static inline char* parse_f64(char* from, f64& val)
 {
-	f64 sign,num_wide;
+	f64 sign;
 	int32 frac_prec, exponent, exponent_sign;
 	uint64 fraction, front_num;
 	from = skip_whitespace(from);
@@ -171,10 +171,10 @@ static inline char* parse_float(char* from, f32& val)
 	}
 	exponent -= frac_prec;									//Adding back the decimal shift that was ignored
 
-	num_wide = (f64)front_num;
+	val = (f64)front_num;
+	val = val * sign;
 	exponent = (exponent >= -AT_POWER_10_OFFSET && exponent <= 19) ? exponent : 0;
-	num_wide *=  POWER_10[exponent + AT_POWER_10_OFFSET];
-	val = (f32)num_wide;
+	val *=  POWER_10[exponent + AT_POWER_10_OFFSET];
 	return from;
 }
 

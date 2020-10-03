@@ -4,8 +4,7 @@
 
 struct TileWorkQueue
 {
-	int64 no_of_tiles;
-	Tile* tiles;
+	FDBuffer<Tile>tiles;
 	volatile int64 current_tile = 0;
 };
 
