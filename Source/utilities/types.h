@@ -3,45 +3,18 @@
 #include "platform/platform.h"
 #include <math.h>
 
-// Fundamental Data Types
-
-#define MAX_FLOAT          3.402823466e+38F        // max value
-#define MIN_FLOAT          1.175494351e-38F        // min normalized positive value
-
-#define INV_UINT32_MAX	   2.328306437e-10F
-
-typedef signed char        int8;
-typedef short              int16;
-typedef int                int32;
-typedef long long          int64;
-typedef unsigned char      uint8;
-typedef unsigned short     uint16;
-typedef unsigned int       uint32;
-typedef unsigned long long uint64;
-
-typedef bool b8;
-typedef int b32;
-
-typedef float f32;
-typedef double f64;
-//-----------------------
-
 
 // Operations
 
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 
-template <typename t>
-inline t min(t a, t b)
-{
-	return ((a > b) ? b : a);
-}
+#ifndef max
+#define max(a,b)            (((a) > (b)) ? (a) : (b))
+#endif
 
-template <typename t>
-inline t max(t a, t b)
-{
-	return ((a > b) ? a : b);
-}
+#ifndef min
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+#endif
 
 template <typename T> 
 inline void swap(T& a, T& b)
@@ -66,12 +39,12 @@ inline T sqr(T n)
 // Collections
 //----------------------
 // DYNAMIC BUFFER
-template<typename t, int32 capacity__ = 1,int32 overflow__ = 5>
+template<typename t, int32 capacity__ = 1,int32 overflow__ = 5, typename size_type = int32>
 struct DBuffer
 {
-	int32 length = 0;
-	int32 capacity = capacity__;
-	int32 overflow_addon = overflow__;
+	size_type length = 0;
+	size_type capacity = capacity__;
+	size_type overflow_addon = overflow__;
 	t* front = 0;
 	
 	inline void add(t new_member)
@@ -122,9 +95,9 @@ struct DBuffer
 		free(front);
 	}
 
-	inline t& operator [](int32 index)
+	inline t& operator [](size_type index)
 	{
-		ASSERT(index >= 0 && index < length);
+		ASSERT(index >= 0 && index < (size_type)length);
 		return (front[index]);
 	}
 };
@@ -137,18 +110,32 @@ struct FDBuffer
 	size_type size;
 	t* front = 0;
 
-	inline t* init(int32 size_)
+	//Allocates memory (initilizes to default memory of the type) and returns pointer to allocation
+	inline t* allocate_preserve_type_info(int32 size_)
+	{
+		t tmp;
+		t* front_temp = allocate(size_);
+		for (int i = 0; i < size_; i++)
+		{
+			*front_temp++ = tmp;
+		}
+		return front;
+	}
+
+	//Allocates memory (0 initilized) and returns pointer to allocation
+	inline t* allocate(size_type size_)
 	{
 		size = size_;
 		front = (t*)calloc(size, sizeof(t));
 		return front;
 	}
+	//clears size and deallocates memory 
 	inline void clear()
 	{
 		size = 0;
 		free(front);
 	}
-	inline t& operator [](int32 index)
+	inline t& operator [](size_type index)
 	{
 		ASSERT(index >= 0 && index < size);
 		return (front[index]);

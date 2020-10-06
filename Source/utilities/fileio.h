@@ -73,6 +73,15 @@ static inline b32 is_exponent(char ex)
 	return (ex == 'e' || ex == 'E');
 }
 
+static inline char* skip_to_new_line(char* ptr)
+{
+	while (*ptr != '\n')
+	{
+		ptr++;
+	}
+	return ptr;
+}
+
 static inline char* skip_whitespace(char* ptr)
 {
 	while (is_whitespace(*ptr))
@@ -82,15 +91,75 @@ static inline char* skip_whitespace(char* ptr)
 	return ptr;
 }
 
-//Parses a number steam into a unsigned long long (ignores sign)
+//Parses a number steam into a int32 
+static inline char* parse_int(char* from, int32& val)
+{
+	from = skip_whitespace(from);
+	int32 sign;
+	switch (*from)
+	{
+	case '+':
+		sign = 1;
+		from++;
+		break;
+	case '-':
+		sign = -1;
+		from++;
+		break;
+	default:
+		sign = 1;
+		break;
+	}
+
+	val = 0;
+	while (is_digit(*from))
+	{
+		val = (val * 10) + (*from - '0');
+		from++;
+	}
+	val = val * sign;
+	return from;
+}
+
+//Parses a number steam into a int64
+static inline char* parse_int(char* from, int64& val)
+{
+	from = skip_whitespace(from);
+	int64 sign;
+	switch (*from)
+	{
+	case '+':
+		sign = 1;
+		from++;
+		break;
+	case '-':
+		sign = -1;
+		from++;
+		break;
+	default:
+		sign = 1;
+		break;
+	}
+
+	val = 0;
+	while (is_digit(*from))
+	{
+		val = (val * 10) + (*from - '0');
+		from++;
+	}
+	val = val * sign;
+	return from;
+}
+
+//Parses a number steam into a uint64 (ignores sign)
 static inline char* parse_uint(char* from, uint64& val)
 {
 	from = skip_whitespace(from);
 
-	uint64 num = 0;
+	val = 0;
 	while (is_digit(*from))
 	{
-		num = (num * 10) + (*from - '0');
+		val = (val * 10) + (*from - '0');
 		from++;
 	}
 	return from;
@@ -178,8 +247,19 @@ static inline char* parse_f64(char* from, f64& val)
 	return from;
 }
 
-
-
+//parses a vec3f and returns pointer after parsing
+inline char* parse_vec3f(char* pos, vec3f& vec)
+{
+	char* ptr;
+	f64 flt;
+	ptr = parse_f64(pos, flt);
+	vec.x = (f32)flt;
+	ptr = parse_f64(ptr, flt);
+	vec.y = (f32)flt;
+	ptr = parse_f64(ptr, flt);
+	vec.z = (f32)flt;
+	return ptr;
+}
 
 
 #undef AT_MAX_POWER_OFFSET

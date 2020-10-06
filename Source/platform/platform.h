@@ -13,6 +13,11 @@
 #endif 
 
 //-----------------------------------------------
+#define MAX_FLOAT          3.402823466e+38F        // max value
+#define MIN_FLOAT          1.175494351e-38F        // min normalized positive value
+#define UINT32MAX		   0xffffffff			
+#define INV_UINT32_MAX	   2.328306437e-10F
+
 typedef signed char        int8;
 typedef short              int16;
 typedef int                int32;
@@ -31,6 +36,10 @@ typedef double f64;
 
 
 //-----------platform specific------------------
+//-------------------------------------------<MEMORY ALLOCATION>-------------------------------------------
+void buffer_copy(void* destination, void* from, uint32 length);
+
+//-------------------------------------------</MEMORY ALLOCATION>-------------------------------------------
 
 //------------------------------------------<THREADING>--------------------------------------------
 //Data for a handle to a thread
@@ -45,8 +54,14 @@ typedef void (*ThreadProc)(void*);
 //creates thread and returns a handle to the thread (only use functions defined in this header to operate on handle)
 ThreadHandle create_thread(ThreadProc proc, void * data);
 
+//release thread handle
+void close_thread(const ThreadHandle* handle);
+
 //release thread handles
 void close_threads(uint32 no_of_threads, const ThreadHandle* handles);
+
+//Waits for thread to finish or timeout
+void wait_for_thread(const ThreadHandle* handle, uint32 timeout_in_ms);
 
 //waits for all threads to be released
 void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms);
@@ -54,14 +69,23 @@ void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uin
 //gets unique thread id
 uint32 get_thread_id();
 
-//returns resulting incremented value after performing locked increment
-int64 interlocked_increment(volatile int64*);
+//performs atomic add and returns result(for int64 value)
+int64 interlocked_add_i64(volatile int64*, int64);
+//performs atomic add and returns result(for int32 value)
+int32 interloacked_add_i32(volatile int32* data, int32 value);
 
-//returns resulting decremented value after performing locked decrement
-int64 interlocked_decrement(volatile int64* data);
 
-//performs atomic add and returns result
-int64 interlocked_add(volatile int64*, int64);
+//returns resulting incremented value after performing locked increment(for int64 value)
+int64 interlocked_increment_i64(volatile int64*);
+//returns resulting decremented value after performing locked decrement(for int32 value)
+int64 interlocked_increment_i32(volatile int32* data);
+
+
+//returns resulting decremented value after performing locked decrement(for int64 value)
+int64 interlocked_decrement_i64(volatile int64* data);
+//returns resulting decremented value after performing locked decrement(for int32 value)
+int64 interlocked_decrement_i32(volatile int32* data);
+
 
 //gets number of cpu cores
 uint32 get_core_count();
@@ -82,6 +106,7 @@ b32 file_close(void* file);
 //(check if returned and bytes_to_read are equal to check for success) 
 uint32 load_from_file(void* file, uint32 bytes_to_read, void* block_to_store);
 
+//returns file size
 uint32 get_file_size(void* file);
 
 //--------------------------------------</FILE I/O>------------------------------------

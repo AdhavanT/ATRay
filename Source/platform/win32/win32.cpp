@@ -3,6 +3,7 @@
 #include <windows.h>
 #include <corecrt_malloc.h>
 
+
 uint32 get_core_count()
 {
 	static uint32 core_count = 0;
@@ -28,22 +29,42 @@ uint32 get_core_count()
 	return __rdtsc();
 }
 
- int64 interlocked_add(volatile int64* data, int64 value)
+ int32 interloacked_add_i32(volatile int32* data, int32 value)
+ {
+	 return InterlockedAdd((volatile long*)data, value);
+ }
+
+ int64 interlocked_add_i64(volatile int64* data, int64 value)
 {
 	return InterlockedAdd64(data, value);
 }
 
-int64 interlocked_decrement(volatile int64* data)
+int64 interlocked_decrement_i32(volatile int32* data)
+{
+	return InterlockedDecrement((volatile long*)data);
+}
+
+int64 interlocked_increment_i32(volatile int32* data)
+{
+	return InterlockedIncrement((volatile long*)data);
+}
+
+int64 interlocked_decrement_i64(volatile int64* data)
 {
 	return InterlockedDecrement64(data);
 }
 
-int64 interlocked_increment(volatile int64* data)
+int64 interlocked_increment_i64(volatile int64* data)
 {
 	return InterlockedIncrement64(data);
 }
 
- void close_threads(uint32 no_of_threads, const ThreadHandle* handles)
+void close_thread(const ThreadHandle* handle)
+{
+	CloseHandle(handle->thread_handle);
+}
+
+void close_threads(uint32 no_of_threads, const ThreadHandle* handles)
 {
 	for (uint32 i = 0; i < no_of_threads; i++)
 	{
@@ -51,7 +72,12 @@ int64 interlocked_increment(volatile int64* data)
 	}
 }
 
- void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms)
+void wait_for_thread(const ThreadHandle* handle, uint32 timeout_in_ms)
+ {
+	 WaitForSingleObject((HANDLE*)handle, timeout_in_ms);
+ }
+
+void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms)
 {
 	WaitForMultipleObjects(no_of_threads, (HANDLE*)handles, TRUE, timeout_in_ms);
 }
@@ -71,7 +97,12 @@ static DWORD WINAPI win32_start_thread(__in LPVOID lpParameter)
 	return 0;
 }
 
- ThreadHandle create_thread(ThreadProc proc, void* data)
+void buffer_copy(void* destination, void* from, uint32 length)
+{
+	CopyMemory(destination, from, length);
+}
+
+ThreadHandle create_thread(ThreadProc proc, void* data)
 {
 	CreateThreadData *new_thread_data = (CreateThreadData*)malloc(sizeof(CreateThreadData));
 	new_thread_data->func_to_be_executed = proc;

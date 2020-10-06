@@ -5,7 +5,9 @@
 
 struct Scene
 {
-	Material skybox;
+	//TODO: These are DBuffers for now. They will be FDBuffers when scene loading is implemented
+	//and the sizes are known before adding
+	DBuffer<Material> materials;
 
 	DBuffer<Model> models;
 
@@ -14,4 +16,3 @@ struct Scene
 	DBuffer<Plane> planes;
 };
 
-void init_scene(Scene& scene);

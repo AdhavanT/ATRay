@@ -2,7 +2,7 @@
 #include "utilities/types.h"
 #include "settings.h"
 #include "ray.h"
-#include "renderer/renderer.h"
+#include "renderer.h"
 
 //Camera always faces along -z camera axis
 //this is to consistent with opengl and the "right hand" system 
@@ -43,7 +43,6 @@ static inline void set_camera(Camera& cm, vec3f eye, vec3f facing_towards, Rende
 	cm.half_pixel_width = (0.5f * cm.h_fov) / (f32)render_settings.resolution.x;
 	cm.half_pixel_height = 0.5f / (f32)render_settings.resolution.y;
 }
-
 
 
 static inline void get_ray_from_camera(Ray& ray, Camera& cm, f32 film_x, f32 film_y, RNG_Stream* rng)

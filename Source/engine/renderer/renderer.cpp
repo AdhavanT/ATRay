@@ -1,23 +1,33 @@
 #include "renderer.h"
-#include "camera.h"
+
+struct RenderInfo
+{
+	WorkQueue<Tile> twq;
+
+	Camera* camera;
+	Scene* scene;
+	Texture* camera_tex;
+
+	volatile int64 total_ray_casts = 0;
+};
 
 f32 tolerance = 0.0001f;
 
-vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream* rng_stream);
+static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream* rng_stream);
 
 
 static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 {
 	Tile* tile_;
-	int64 tile_no = interlocked_increment(&info.twq.current_tile);
-	if (tile_no > info.twq.tiles.size)
+	int64 tile_no = interlocked_increment_i32(&info.twq.jobs_done);
+	if (tile_no > info.twq.jobs.size)
 	{
-		interlocked_decrement(&info.twq.current_tile);
+		interlocked_decrement_i32(&info.twq.jobs_done);
 		return false;
 	}
 	else
 	{
-		tile_ = info.twq.tiles.front + tile_no - 1;
+		tile_ = &info.twq.jobs[(int32)tile_no - 1];
 	}
 
 	vec3f pixel_pos;
@@ -58,14 +68,14 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 		}
 	}
 
-	interlocked_add(&info.total_ray_casts, ray_casts);
+	interlocked_add_i64(&info.total_ray_casts, ray_casts);
 
 	return true;
 }
 
 
 
-static void start_thread(void* data)
+static void start_tile_render_thread(void* data)
 {
 	RenderInfo* info = (RenderInfo*)data;
 	RNG_Stream rng_stream;
@@ -74,43 +84,88 @@ static void start_thread(void* data)
 
 	while (render_tile_from_camera(*info, &rng_stream))
 	{
-		printf("\rTiles loaded: %I64i/%i", info->twq.current_tile, info->twq.tiles.size);
+		printf("\rTiles loaded: %i/%i", info->twq.jobs_done, info->twq.jobs.size);
 	}
 }
 
 
 //Divides image into tiles and creates multiple threads to finish all tiles. 
-int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex)
+int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpool)
 {
 	RenderInfo info;
 	info.camera_tex = &tex;
 	info.camera = &cm;
 	info.scene = &scene;
-	create_tile_work_queue(info.twq,tex);
 
-	FDBuffer<ThreadHandle> threads;
-	threads.init(cm.render_settings.no_of_threads);
-	for (int32 i = 0; i < threads.size; i++)
+
+	//Creates a WorkQueue made of tiles
+	int32 tile_width = tex.bmb.width / get_core_count();	//ASSESS: which tile_width value gives best results
+	int32 tile_height = tile_width;	// for square tiles
+
+	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= (int32)tex.bmb.height);
+
+	int32 no_x_tiles = (tex.bmb.width + tile_width - 1) / tile_width;
+	int32 no_y_tiles = (tex.bmb.height + tile_height - 1) / tile_height;
+
+	int32 total_tiles = no_y_tiles * no_x_tiles;
+
+	Tile* tmp = info.twq.jobs.allocate(total_tiles);
+	info.twq.jobs_done = 0;
+
+	//Creates the "tiles" and adds it into a "tile_work_queue"
+	for (int y = 0; y < no_y_tiles; y++)
 	{
-		threads[i] = create_thread(start_thread, &info);
+		for (int x = 0; x < no_x_tiles; x++)
+		{
+			uint32 minx, miny, maxx, maxy;
+			minx = x * tile_width;
+			miny = y * tile_height;
+			maxx = minx + tile_width;
+			maxy = miny + tile_height;
+			if (maxx > tex.bmb.width - 1)
+			{
+				maxx = (tex.bmb.width - 1);
+			}
+			if (maxy > tex.bmb.height - 1)
+			{
+				maxy = (tex.bmb.height - 1);
+			}
+			tmp->left_top = { (int32)minx, (int32)miny };
+			tmp->right_bottom = { (int32)maxx, (int32)maxy };
+			tmp++;
+		}
 	}
 
-	wait_for_all_threads(cm.render_settings.no_of_threads, threads.front, INFINITE);
-	close_threads(cm.render_settings.no_of_threads, threads.front);
+	activate_pool(tpool, start_tile_render_thread, &info);
 
-	free_tile_work_queue(info.twq);
+	wait_for_pool(tpool);
+
+	if (info.twq.jobs_done == info.twq.jobs.size)
+	{
+		info.twq.jobs.clear();
+	}
+	else
+	{
+		ASSERT(false);	//All tiles not rendered!
+	}
 
 	return info.total_ray_casts;
 }
 
 
-inline vec3f get_reflection(vec3f incident, vec3f normal)
+static inline vec3f get_reflection(vec3f incident, vec3f normal)
 {
 	normalize(normal);
 	vec3f reflection = -(normal * (2 * dot(incident, normal))) + incident;
 	return reflection;
 }
 
+struct TriangleIntersectionData
+{
+	Model* model;
+	Face* face;
+	f32 u, v;
+};
 
 static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
 {
@@ -124,20 +179,26 @@ static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_cas
 	f32 closest = MAX_FLOAT;
 	Sphere *nearest_sphere = nullptr;
 	Plane *nearest_plane = nullptr;
-	TriangleVertices* nearest_triangle = nullptr;
-	f32 u, v;
+	TriangleIntersectionData nearest_triangle = { 0 };
 
-	for (int i = 0; i < scene.models.length; i++)
+	for (int32 i = 0; i < scene.models.length; i++)
 	{
-		for (int j = 0; j < scene.models[i].triangles.length; j++)
+		for (uint32 j = 0; j < scene.models[i].data.faces.size; j++)
 		{
-			TriangleVertices* tri = &scene.models[i].triangles[j];
+			TriangleVertices tri;
+			tri.a = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[0]];
+			tri.b = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[1]];
+			tri.c = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[2]];
 
-			f32 t = get_triangle_ray_intersection_culled(ray,*tri,u,v);
+			f32 u, v;
+			f32 t = get_triangle_ray_intersection_culled(ray,tri,u,v);
 			if (t > tolerance && t < closest)
 			{
 				closest = t;
-				nearest_triangle = tri;
+				nearest_triangle.u = u;
+				nearest_triangle.v = v;
+				nearest_triangle.model = &scene.models[i];
+				nearest_triangle.face = &scene.models[i].data.faces[j];
 			}
 		}
 
@@ -175,28 +236,41 @@ static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_cas
 	if (nearest_plane != nullptr)	//nearest hit is a plane
 	{
 		hit_normal = nearest_plane->normal;
-		material = nearest_plane->material;
+		material = *nearest_plane->material;
 	}
 	else if(nearest_sphere != nullptr)	//nearest hit is a sphere
 	{
 		hit_normal = reflected.origin - nearest_sphere->center;
 		normalize(hit_normal);
-		material = nearest_sphere->material;
+		material = *nearest_sphere->material;
 	}
 	//just some code to test if intersection works
-	else if (nearest_triangle != nullptr)	//nearest hit is a triangle
+	else if (nearest_triangle.model != nullptr)	//nearest hit is a triangle
 	{
-		vec3f ab = nearest_triangle->a - nearest_triangle->b;
-		vec3f ac = nearest_triangle->a - nearest_triangle->c;
-		hit_normal = cross(ab, ac);
-		normalize(hit_normal);
+		vec3f normal_a, normal_b, normal_c;
+		if (nearest_triangle.model->data.normals.size > 0)
+		{
+			normal_a = nearest_triangle.model->data.normals[nearest_triangle.face->vertex_normals_indices[0]];
+			normal_b = nearest_triangle.model->data.normals[nearest_triangle.face->vertex_normals_indices[1]];
+			normal_c = nearest_triangle.model->data.normals[nearest_triangle.face->vertex_normals_indices[2]];
+
+			//Interpolating normals
+			hit_normal = normal_a * (1 - nearest_triangle.u - nearest_triangle.v)  + normal_b * nearest_triangle.u + normal_c * nearest_triangle.v;
+		}
+		else
+		{
+			vec3f ab = nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[0]] - nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[1]];
+			vec3f ac = nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[0]] - nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[2]];
+			hit_normal = cross(ab, ac);
+			normalize(hit_normal);
+		}
 		//For now, triangles are red.
 		material.color = {1,0,0};
 		material.specularity = 0.2f;
 	}
 	else
 	{
-		return scene.skybox.color;
+		return scene.materials[0].color;
 	}
 
 	f32 attenuation = dot(ray.direction, hit_normal);
