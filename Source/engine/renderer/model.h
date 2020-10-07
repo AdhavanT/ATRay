@@ -31,6 +31,11 @@ struct Model
 	ModelData data;			
 };
 
+struct AABB
+{
+	vec3f max;
+	vec3f min;
+};
 
 //Uses Moller-Trumbore intersection algorithm
 //intersection_point = (1-u-v)*tri.a + u*tri.b + v*tri.c
@@ -63,7 +68,9 @@ static inline f32 get_triangle_ray_intersection_culled(Ray& ray, TriangleVertice
 	return dot(qvec, ac) * det_inv; //t
 
 }
-inline vec3f get_scale_per_axis(Model& mdl)
+
+//Gets the scale per axis of the model
+inline AABB get_AABB(Model& mdl)
 {
 	f32 x_max = -MAX_FLOAT, x_min = MAX_FLOAT, y_max = -MAX_FLOAT, y_min = MAX_FLOAT, z_max = -MAX_FLOAT, z_min = MAX_FLOAT;
 	for (uint32 i = 0; i < mdl.data.vertices.size; i++)
@@ -77,16 +84,34 @@ inline vec3f get_scale_per_axis(Model& mdl)
 		z_max = max(z_max, mdl.data.vertices[i].z);
 		z_min = min(z_min, mdl.data.vertices[i].z);
 	}
-	return (vec3f((x_max - x_min), (y_max - y_min), (z_max - z_min)));
+	AABB ret;
+	ret.max = { x_max,y_max,z_max };
+	ret.min = { x_min, y_min, z_min };
+	return (ret);
 }
 
-void resize_scale(Model& mdl,vec3f& scale_per_axis ,f32 new_max_scale)
+//Resizes the model into a max scale 
+inline void resize_scale(Model& mdl,AABB& bounding_box ,f32 new_max_scale)
 {
 	f32 rescale_factor;
-	f32 max_scale = max(max(scale_per_axis.x, scale_per_axis.y), scale_per_axis.z);
+	vec3f scale_range = bounding_box.max - bounding_box.min;
+	f32 max_scale = max(max(scale_range.x, scale_range.y), scale_range.z);
 	rescale_factor = (new_max_scale / max_scale);
 	for (uint32 i = 0; i < mdl.data.vertices.size; i++)
 	{
 		mdl.data.vertices[i] *= rescale_factor ;
+	}
+	bounding_box.max = bounding_box.max * rescale_factor;
+	bounding_box.min = bounding_box.min * rescale_factor;
+}
+
+inline void translate_to(Model& mdl, AABB& aabb, vec3f new_center)
+{
+	vec3f old_center = (aabb.max - aabb.min) / 2;
+	vec3f translation = new_center - old_center;
+
+	for (uint32 i = 0; i < mdl.data.vertices.size; i++)
+	{
+		mdl.data.vertices[i] += translation;
 	}
 }

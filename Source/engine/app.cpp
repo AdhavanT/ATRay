@@ -20,14 +20,16 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	ATP_START(load_assets);
 
 	printf("\nLoading Assets...\n");
-	Model mdl_loaded;
-	load_model(mdl_loaded.data, "Assets\\Deer.obj", tpool);
-	
+	Model deer;
+	load_model(deer.data, "Assets\\Deer.obj", tpool);
+	AABB deer_scale = get_AABB(deer);
+	resize_scale(deer, deer_scale, 2);
+	translate_to(deer, deer_scale, { 3.f,2.f,-7.f });
 	ATP_END(load_assets);
 
 	Camera cm;
 	RenderSettings rs;
-	rs.no_of_threads = get_core_count();
+	rs.no_of_threads = tpool.threads.size;
 	rs.anti_aliasing = true;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
@@ -56,11 +58,11 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	Sphere spr[2];
 	Plane pln[2];
 
-	spr[0].center = { 0.f,1.0f,-7.f };
+	spr[0].center = { -1.f,1.0f,-7.f };
 	spr[0].radius = 1.0f;
 	spr[0].material = &scene.materials[1];
 
-	spr[1].center = { 2.f,1.5f,-7.f };
+	spr[1].center = { 1.f,1.f,-7.f };	
 	spr[1].radius = 1.f;
 	spr[1].material = &scene.materials[2];
 
@@ -75,7 +77,7 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	pln[1].normal = { 0.f,1.f,0.f };
 	pln[1].material = &scene.materials[4];
 
-	scene.models.add_nocpy(mdl_loaded);
+	scene.models.add_nocpy(deer);
 	scene.planes.add(pln[0]);
 	scene.planes.add(pln[1]);
 	scene.spheres.add(spr[0]);
