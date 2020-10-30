@@ -1,5 +1,6 @@
 #pragma once
 #include "material.h"
+#include "box.h"
 #include "ray.h"
 
 extern f32 tolerance;
@@ -20,6 +21,7 @@ struct Face
 
 struct ModelData
 {
+	Material* material;
 	FDBuffer<vec3f, uint32> vertices;
 	FDBuffer<vec3f, uint32> normals;
 	FDBuffer<vec3f, uint32> tex_coords;
@@ -29,12 +31,6 @@ struct ModelData
 struct Model
 {	
 	ModelData data;			
-};
-
-struct AABB
-{
-	vec3f max;
-	vec3f min;
 };
 
 //Uses Moller-Trumbore intersection algorithm

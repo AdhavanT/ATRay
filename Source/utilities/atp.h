@@ -70,16 +70,6 @@ ATP builds a global buffer to hold all "TestType"s
 #include <Windows.h>
 #endif
 
-//Used for memory allocation in free, malloc, realloc
-#ifdef _WIN32 
-#include <corecrt_malloc.h>
-#else
-#include <stdlib.h>
-#endif
-#define ATP_REALLOC realloc
-#define ATP_CALLOC calloc
-#define ATP_FREE free
-
 
 namespace ATP
 {
@@ -205,9 +195,7 @@ namespace ATP
 #ifndef ATP_IS_IMPLEMENTATION
 
 //Removing libraries macros 
-#undef ATP_REALLOC 
-#undef ATP_CALLOC 
-#undef ATP_FREE 
+
 #undef ATP_TESTTYPE_BUFFER_INIT_CAPACITY 
 #undef ATP_TESTTYPE_BUFFER_INIT_OVERFLOW_ADDON 
 #undef ATP_USE_QPC

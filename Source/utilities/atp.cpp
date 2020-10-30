@@ -1,6 +1,17 @@
 #define ATP_IS_IMPLEMENTATION
 #include "atp.h"
 
+//Used for memory allocation in free, malloc, realloc
+#ifdef _WIN32 
+#include <corecrt_malloc.h>
+#else
+#include <stdlib.h>
+#endif
+#define ATP_REALLOC realloc
+#define ATP_CALLOC calloc
+#define ATP_FREE free
+
+
 #ifndef ATP_TURN_OFF
 
 namespace ATP

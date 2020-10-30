@@ -1,6 +1,5 @@
 #pragma once
 
-#include <corecrt_malloc.h>	//for malloc and free
 #include <stdio.h>	//for printf()
 
 //This is used as a guide for platform specific code that needs to be implemented 
@@ -37,8 +36,13 @@ typedef double f64;
 
 //-----------platform specific------------------
 //-------------------------------------------<MEMORY ALLOCATION>-------------------------------------------
+//Copies a buffer of size "length" into destination
 void buffer_copy(void* destination, void* from, uint32 length);
-
+void* buffer_malloc(size_t size);
+void* buffer_calloc(size_t size);
+void* buffer_realloc(void* block, size_t new_size);
+void buffer_free(void* buffer);
+extern int32 freed, allocations;
 //-------------------------------------------</MEMORY ALLOCATION>-------------------------------------------
 
 //------------------------------------------<THREADING>--------------------------------------------

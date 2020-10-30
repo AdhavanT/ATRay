@@ -50,7 +50,7 @@ namespace BMP_FILE_FORMAT
 		bmp.bytes_per_pixel = 4;
 		bmp.height = height;
 		bmp.width = width;
-		bmp.buffer_memory = malloc(bmp.size());
+		bmp.buffer_memory = buffer_malloc(bmp.size());
 	}
 
 	static bool Write_To_File(BitmapBuffer& bmb, const char* file_name)
@@ -86,7 +86,7 @@ namespace BMP_FILE_FORMAT
 		uint32 file_id = 0;
 		int length = strlen(file_name);
 
-		char* new_name = (char*)malloc(length + 8);
+		char* new_name = (char*)buffer_malloc(length + 8);
 
 		snprintf(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 
@@ -105,7 +105,7 @@ namespace BMP_FILE_FORMAT
 
 		if (fopen_s(&file, new_name, "wb"))
 		{
-			free(new_name);
+			buffer_free(new_name);
 			return false;
 		}
 
@@ -113,7 +113,7 @@ namespace BMP_FILE_FORMAT
 		fwrite(&bmp.bih, sizeof(bmp.bih), 1, file);
 		fwrite(bmp.bitmap_buffer.buffer_memory, bmp.bitmap_buffer.size(), 1, file);
 		fclose(file);
-		free(new_name);
+		buffer_free(new_name);
 		return true;
 	}
 

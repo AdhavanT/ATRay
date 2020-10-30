@@ -52,12 +52,12 @@ struct DBuffer
 		length++;
 		if (front == 0)		//Buffer was not initilized and is being initialized here. 
 		{
-			front = (t*)calloc(capacity , sizeof(t));
+			front = (t*)buffer_calloc(capacity * sizeof(t));
 		}
 		if (length > capacity)
 		{
 			capacity = capacity + overflow_addon;
-			t* temp = (t*)realloc(front, capacity * sizeof(t));
+			t* temp = (t*)buffer_realloc(front, capacity * sizeof(t));
 			ASSERT(temp);	//Not enough memory to realloc, or buffer was never initialized and realloc is trying to allocate to null pointer
 			front = temp;
 		}
@@ -73,12 +73,12 @@ struct DBuffer
 		length++;
 		if (front == 0)		//Buffer was not initilized and is being initialized here. 
 		{
-			front = (t*)calloc(capacity, sizeof(t));
+			front = (t*)buffer_calloc(capacity * sizeof(t));
 		}
 		if (length > capacity)
 		{
 			capacity = capacity + overflow_addon;
-			t* temp = (t*)realloc(front, capacity * sizeof(t));
+			t* temp = (t*)buffer_realloc(front, capacity * sizeof(t));
 			ASSERT(temp);	//Not enough memory to realloc, or buffer was never initialized and realloc is trying to allocate to null pointer
 			front = temp;
 		}
@@ -92,7 +92,7 @@ struct DBuffer
 	inline void clear_buffer()
 	{
 		length = 0;
-		free(front);
+		buffer_free(front);
 	}
 
 	inline t& operator [](size_type index)
@@ -126,14 +126,14 @@ struct FDBuffer
 	inline t* allocate(size_type size_)
 	{
 		size = size_;
-		front = (t*)calloc(size, sizeof(t));
+		front = (t*)buffer_calloc(size * sizeof(t));
 		return front;
 	}
 	//clears size and deallocates memory 
 	inline void clear()
 	{
 		size = 0;
-		free(front);
+		buffer_free(front);
 	}
 	inline t& operator [](size_type index)
 	{
@@ -530,10 +530,10 @@ struct Mat44
 //----------------------
 
 //Returns |p|*|n|*cos(theta) 
-inline f32 dot(vec3f& p, vec3f& n) { return (p.x * n.x) + (p.y * n.y) + (p.z * n.z); };
+inline f32 dot(vec3f p, vec3f n) { return (p.x * n.x) + (p.y * n.y) + (p.z * n.z); };
 
 //Returns vector as result of multiplication of individual components
-inline vec3f hadamard(vec3f& a, vec3f& b) { return vec3f(a.x * b.x, a.y * b.y, a.z * b.z); }
+inline vec3f hadamard(vec3f a, vec3f b) { return vec3f(a.x * b.x, a.y * b.y, a.z * b.z); }
 
 //Returns |a|*|b|* sin(theta) * n_cap(n_cap is normalized perpendicular to a and b)
 inline vec3f cross(vec3f& a, vec3f& b) { return vec3f(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x); }
@@ -542,6 +542,14 @@ inline vec3f cross(vec3f& a, vec3f& b) { return vec3f(a.y * b.z - a.z * b.y, a.z
 inline vec2f lerp(vec2f& start, vec2f& towards, f32 interpolation)
 {
 	return { (towards - start) / interpolation };
+}
+
+inline vec3f clamp(vec3f v, f32 lower, f32 upper)
+{
+	v.x = max(lower, min(v.x, upper));
+	v.y = max(lower, min(v.y, upper));
+	v.z = max(lower, min(v.z, upper));
+	return v;
 }
 
 //used to interpolate between vectors. value should be between 0 and 1.
@@ -556,10 +564,48 @@ inline vec4f lerp(vec4f& start, vec4f& towards, f32 interpolation)
 	return { ((towards - start) * interpolation) + start };
 }
 
+//proper conversion of linear to srgb color space
+inline f32 linear_to_srgb(f32 l)
+{
+	if (l < 0)
+	{
+		l = 0;
+	}
+	if (l > 1.0f)
+	{
+		l = 1.0f;
+	}
+	f32 s = l * 12.92f;;
+	if (l > 0.0031308f)
+	{
+		s = 1.055f * powf(l, 1.0f / 2.4f) - 0.055f;
+	}
+	return s;
+}
+
+//proper conversion of linear to srgb color space
+inline vec3f linear_to_srgb(vec3f l)
+{
+	vec3f srgb;
+	srgb.r = linear_to_srgb(l.r);
+	srgb.g = linear_to_srgb(l.g);
+	srgb.b = linear_to_srgb(l.b);
+	return srgb;
+}
+
+inline vec3f rgb_gamma_correct(vec3f color)
+{
+	vec3f gamma_correct;
+	gamma_correct.r = sqrtf(color.r);
+	gamma_correct.g = sqrtf(color.g);
+	gamma_correct.b = sqrtf(color.b);
+	return gamma_correct;
+}
+
 //used to convert float 0.0 to 1.0 rgb values to a byte vector
 inline vec3b rgb_float_to_byte(vec3f& color)
 {
-	return vec3b((uint8)(color.r * 255.0), (uint8)(color.g * 255.0), (uint8)(color.b * 255.0));
+	return vec3b((uint8)(color.r * 255.0f), (uint8)(color.g * 255.0f), (uint8)(color.b * 255.0f));
 }
 
 

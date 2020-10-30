@@ -1,15 +1,12 @@
 #include "app.h"
 #include "utilities/atp.h"
-#include "engine/OBJ_loader.h"
+#include "engine/tools/OBJ_loader.h"
 
 
 ATP_REGISTER(render_app);
 ATP_REGISTER(load_assets);
 ATP_REGISTER(prep_scene);
 ATP_REGISTER(render_from_camera);
-
-//ASSESS: How I wanna store a "Face" and whether I want to parse the model like this and do pre-processing later
-
 
 void print_out_tests();
 
@@ -21,10 +18,16 @@ void render_app(Texture& texture, ThreadPool& tpool)
 
 	printf("\nLoading Assets...\n");
 	Model deer;
-	load_model(deer.data, "Assets\\Deer.obj", tpool);
+	load_model_data(deer.data, "Assets\\Deer.obj", tpool);
 	AABB deer_scale = get_AABB(deer);
 	resize_scale(deer, deer_scale, 2);
-	translate_to(deer, deer_scale, { 3.f,2.f,-7.f });
+	translate_to(deer, deer_scale, { 1.f,2.f,-4.f });
+
+	Model monkey;
+	load_model_data(monkey.data, "Assets\\Monkey.obj", tpool);
+	AABB monkey_scale = get_AABB(deer);
+	resize_scale(monkey, monkey_scale, 2);
+	translate_to(monkey, monkey_scale, { 1.f,2.f,-3.f });
 	ATP_END(load_assets);
 
 	Camera cm;
@@ -33,23 +36,25 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	rs.anti_aliasing = true;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
-	rs.samples_per_pixel = 16;
+	rs.samples_per_pixel = 1;
 	rs.bounce_limit = 5;
 
 	set_camera(cm, { 0.f,1.f,0.f }, { 0.f, 0.0f,-1.f }, rs, 1.0f);
 
 	Scene scene;
-	Material skybox;
-	Material sphere_1 = { {0.f,0.8f,0.9f }, 0.3f };
-	Material sphere_2 = { {0.9f,0.4f,0.2f }, 0.9f };
-	Material plane_2 = { { 0.2f, 0.3f,0.2f } , 0.f };
-	Material ground_plane = { {0.9f, 0.8f,0.2f } , 0.f };
+	Material skybox = { {0.3f,0.4f,0.5f}, {0.2f,0.3f,0.4f},0.3f };
+	Material sphere_1 = { {0.f,0.0f,0.0f }, {0.2f,0.8f,0.2f },0.3f };
+	Material sphere_2 = { {0.0f,0.0f,0.0f }, {0.4f,0.8f,0.9f },0.9f };
+	Material plane_2 = { { 0.0f, 0.4f,0.6f } , { 0.2f, 0.3f,0.2f },0.f };
+	Material ground_plane = { {0.f, 0.f,0.0f } , {0.5f, 0.5f,0.5f },0.f };
+	Material model = { {0.4f,0.2f,0.2f}, {0.92f,0.5f,0.0f},0.3f };
 
 	scene.materials.add(skybox);	//The first material is the skybox
 	scene.materials.add(sphere_1);
 	scene.materials.add(sphere_2);
 	scene.materials.add(plane_2);
 	scene.materials.add(ground_plane);
+	scene.materials.add(model);
 
 	//NOTE: this stuff is ad-hoc right now and should be properly implemented. 
 	//Should Objects contain a pointer to a material or should they have an "index" instead...
@@ -63,21 +68,22 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	spr[0].material = &scene.materials[1];
 
 	spr[1].center = { 1.f,1.f,-7.f };	
-	spr[1].radius = 1.f;
+	spr[1].radius = 1.f;    
 	spr[1].material = &scene.materials[2];
 
 
-	pln[0].distance = 7.f;
-	pln[0].normal = { -1.f,0.f,0.f };
+	pln[0].distance = -7.f;
+	pln[0].normal = { 1.f,0.f,0.f };
 	pln[0].material = &scene.materials[3];
-
 
 	//ground plane
 	pln[1].distance = 0.f;
 	pln[1].normal = { 0.f,1.f,0.f };
 	pln[1].material = &scene.materials[4];
 
-	scene.models.add_nocpy(deer);
+	monkey.data.material = &scene.materials[5];
+
+	//scene.models.add_nocpy(monkey);
 	scene.planes.add(pln[0]);
 	scene.planes.add(pln[1]);
 	scene.spheres.add(spr[0]);

@@ -43,20 +43,3 @@ static inline void set_camera(Camera& cm, vec3f eye, vec3f facing_towards, Rende
 	cm.half_pixel_width = (0.5f * cm.h_fov) / (f32)render_settings.resolution.x;
 	cm.half_pixel_height = 0.5f / (f32)render_settings.resolution.y;
 }
-
-
-static inline void get_ray_from_camera(Ray& ray, Camera& cm, f32 film_x, f32 film_y, RNG_Stream* rng)
-{
-	vec3f pixel_pos;
-	if (cm.render_settings.anti_aliasing)
-	{
-		f32 x_off = rand_bi(rng) * cm.half_pixel_width + film_x;
-		f32 y_off = rand_bi(rng) * cm.half_pixel_height + film_y;
-		pixel_pos = cm.frame_center + (cm.camera_x * x_off) + (cm.camera_y * y_off);
-	}
-	else
-	{
-		pixel_pos = cm.frame_center + (cm.camera_x * film_x) + (cm.camera_y * film_y);
-	}
-	SetRay(ray, cm.eye, pixel_pos);
-}

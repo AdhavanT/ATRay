@@ -164,7 +164,7 @@ static bool parse_chunks(WorkQueue<ParseDataChunk>& chunks_)
 		cursor = skip_to_new_line(cursor);
 		cursor++;
 	}
-
+	
 	return true;
 }
 
@@ -252,7 +252,6 @@ static void prep_model_data(ModelData& mdl)
 		mdl.faces[i].vertex_normals_indices[0]--;
 		mdl.faces[i].vertex_normals_indices[1]--;
 		mdl.faces[i].vertex_normals_indices[2]--;
-
 	}
 }
 
@@ -264,7 +263,7 @@ static inline void clear_OBJ_Model_Load_Chunk_Data(OBJ_Model_Load_Chunk_Data& da
 	data.vertices.clear_buffer();
 }
 
-void load_model(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
+void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 {
 	void* file = nullptr;
 	b32 opened = file_open(&file, file_name, "rb");
@@ -274,8 +273,8 @@ void load_model(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 	uint32 file_size = get_file_size(file);
 
 	int32 no_of_chunks = threadpool.threads.size;
-
-	char* buffer_front = (char*)malloc(file_size + 1);
+	
+	char* buffer_front = (char*)buffer_malloc(file_size + 1);
 
 	uint8 file_load = load_from_file(file, file_size, buffer_front);
 
@@ -324,7 +323,7 @@ void load_model(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 	if (chunks.jobs_done == chunks.jobs.size)
 	{
 		//Freeing buffer thats filled with obj file 
-		free(buffer_front);
+		buffer_free(buffer_front);
 		//Deleting chunks
 		for (int i = 0; i < chunks.jobs.size; i++)
 		{

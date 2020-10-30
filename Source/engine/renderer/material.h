@@ -1,8 +1,10 @@
 #pragma once
 #include "utilities/types.h"
 
+
 struct Material
 {
-	vec3f color;
-	f32 specularity;
+	vec3f emission_color;
+	vec3f reflection_color;
+	f32 scatter;
 };

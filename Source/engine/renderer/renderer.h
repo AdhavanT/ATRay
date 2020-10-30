@@ -3,7 +3,7 @@
 #include "utilities/texture.h"
 #include "utilities/atp.h"
 #include "platform/platform.h"
-#include "engine/work_queue.h"
+#include "engine/tools/work_queue.h"
 #include "scene.h"
 #include "camera.h"
 

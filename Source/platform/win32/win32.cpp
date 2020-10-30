@@ -93,7 +93,7 @@ static DWORD WINAPI win32_start_thread(__in LPVOID lpParameter)
 {
 	CreateThreadData * new_thread_data = (CreateThreadData*)lpParameter;
 	new_thread_data->func_to_be_executed(new_thread_data->data);
-	free(new_thread_data);
+	buffer_free(new_thread_data);
 	return 0;
 }
 
@@ -102,9 +102,34 @@ void buffer_copy(void* destination, void* from, uint32 length)
 	CopyMemory(destination, from, length);
 }
 
+int32 allocations = 0;
+void* buffer_malloc(size_t size)
+{
+	allocations++;
+	return malloc(size);
+}
+
+void* buffer_calloc(size_t size)
+{
+	allocations++;
+	return calloc(1,size);
+}
+
+void* buffer_realloc(void* block, size_t new_size)
+{
+	return realloc(block, new_size);
+}
+
+int32 freed = 0;
+void buffer_free(void* buffer)
+{
+	freed++;
+	free(buffer);
+}
+
 ThreadHandle create_thread(ThreadProc proc, void* data)
 {
-	CreateThreadData *new_thread_data = (CreateThreadData*)malloc(sizeof(CreateThreadData));
+	CreateThreadData *new_thread_data = (CreateThreadData*)buffer_malloc(sizeof(CreateThreadData));
 	new_thread_data->func_to_be_executed = proc;
 	new_thread_data->data = data;
 

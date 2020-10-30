@@ -13,8 +13,258 @@ struct RenderInfo
 
 f32 tolerance = 0.0001f;
 
-static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream* rng_stream);
+static inline vec3f get_reflection(vec3f incident, vec3f normal)
+{
+	normalize(normal);
+	vec3f reflection = -(normal * (2 * dot(incident, normal))) + incident;
+	return reflection;
+}
 
+struct TriangleIntersectionData
+{
+	Model* model;
+	Face* face;
+	f32 u, v;
+};
+
+enum class ObjectType
+{
+	TRIANGLE, SPHERE, PLANE, SKYBOX
+};
+
+struct IntersectionData
+{
+	ObjectType type;
+	f32 distance_at_intersection;
+	vec3f normal;
+	Material* hit_material;
+	TriangleIntersectionData tid;
+};
+
+void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& intersection_data)
+{
+	f32 closest = MAX_FLOAT;
+	Sphere* nearest_sphere = nullptr;
+	Plane* nearest_plane = nullptr;
+	intersection_data.tid.model = nullptr;
+
+	for (int32 i = 0; i < scene.models.length; i++)
+	{
+		for (uint32 j = 0; j < scene.models[i].data.faces.size; j++)
+		{
+			TriangleVertices tri;
+			tri.a = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[0]];
+			tri.b = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[1]];
+			tri.c = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[2]];
+
+			f32 u, v;
+			f32 t = get_triangle_ray_intersection_culled(casted_ray, tri, u, v);
+			if (t > tolerance && t < closest)
+			{
+				closest = t;
+				intersection_data.tid.u = u;
+				intersection_data.tid.v = v;
+				intersection_data.tid.model = &scene.models[i];
+				intersection_data.tid.face = &scene.models[i].data.faces[j];
+			}
+		}
+
+	}
+
+	for (int i = 0; i < scene.spheres.length; i++)
+	{
+		Sphere* spr = &scene.spheres[i];
+
+		f32 t = get_sphere_ray_intersection(casted_ray, *spr);
+		if (t > tolerance && t < closest)
+		{
+			closest = t;
+			nearest_sphere = spr;
+		}
+	}
+	for (int i = 0; i < scene.planes.length; i++)
+	{
+		Plane* pln = &scene.planes[i];
+
+		f32 t = get_plane_ray_intersection(casted_ray, *pln);
+		if (t > tolerance && t < closest)
+		{
+			nearest_plane = pln;
+			closest = t;
+		}
+	}
+
+
+	//getting reflected normal
+	if (nearest_plane != nullptr)	//nearest hit is a plane
+	{
+		intersection_data.type = ObjectType::PLANE;
+		intersection_data.normal = nearest_plane->normal;
+		intersection_data.hit_material = nearest_plane->material;
+	}
+	else if (nearest_sphere != nullptr)	//nearest hit is a sphere
+	{
+		intersection_data.type = ObjectType::SPHERE;
+		intersection_data.normal = casted_ray.at(closest) - nearest_sphere->center;
+		intersection_data.hit_material = nearest_sphere->material;
+	}
+	//just some code to test if intersection works
+	else if (intersection_data.tid.model != nullptr)	//nearest hit is a triangle
+	{
+		intersection_data.type = ObjectType::TRIANGLE;
+		//Smooth Shading
+		vec3f normal_a, normal_b, normal_c;
+		if (intersection_data.tid.model->data.normals.size > 0)
+		{
+			normal_a = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[0]];
+			normal_b = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[1]];
+			normal_c = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[2]];
+
+			//Interpolating normals
+			intersection_data.normal = normal_a * (1 - intersection_data.tid.u - intersection_data.tid.v) + normal_b * intersection_data.tid.u + normal_c * intersection_data.tid.v;
+		}
+		//regular shading
+		else
+		{
+			vec3f ab = intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[0]] - intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[1]];
+			vec3f ac = intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[0]] - intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[2]];
+			intersection_data.normal = cross(ab, ac);
+		}
+		//TODO: set the material for 
+		intersection_data.hit_material = intersection_data.tid.model->data.material;
+	}
+	else
+	{
+		//Hits nothing but Skybox
+		intersection_data.hit_material = &scene.materials[0];	//material 0 is skybox
+		intersection_data.type = ObjectType::SKYBOX;
+	}
+	intersection_data.distance_at_intersection = closest;
+	normalize(intersection_data.normal);
+
+	return;
+}
+
+//Quick shading using recursion
+//static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream* rng_stream)
+//{
+//
+//	if (bounce_limit <= 0)
+//	{
+//		return { scene.materials[0].emission_color };
+//	}
+//	ray_casts++;
+//
+//	IntersectionData id;
+//
+//	get_intersection_data(ray, scene, id);
+//
+//	if (id.type == ObjectType::SKYBOX)
+//	{
+//		return id.hit_material->reflection_color;	
+//	}
+//
+//	f32 attenuation = dot(-ray.direction, id.normal);
+//	if (attenuation < 0)
+//	{
+//		id.normal = -id.normal;
+//		attenuation = -attenuation;
+//	}
+//
+//	Ray reflected;
+//
+//	//reflected ray
+//	vec3f pure_bounce;
+//	pure_bounce = reflected.direction - (id.normal * (2 * dot(reflected.direction, id.normal)));
+//	normalize(pure_bounce);
+//
+//	//random ray
+//	vec3f random_bounce = { rand_bi(rng_stream), rand_bi(rng_stream), rand_bi(rng_stream) };
+//	random_bounce += id.normal;
+//	normalize(random_bounce);
+//
+//	//final reflected ray
+//	reflected.origin = reflected.at(id.distance_at_intersection);
+//	reflected.direction = lerp(random_bounce, pure_bounce, id.hit_material->scatter);
+//	normalize(reflected.direction);
+//
+//	vec3f color = cast_ray(reflected, scene, bounce_limit - 1, ray_casts, rng_stream) * id.hit_material->scatter + id.hit_material->reflection_color * (1 - id.hit_material->scatter);
+//	color = color * attenuation;
+//
+//	return  color;
+//}
+
+
+//returns color from casting ray into scene
+static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
+{
+	int i;
+	vec3f return_color = { 0,0,0 };
+	vec3f weight = { 1.0f,1.0f,1.0f };
+	Ray casted_ray = ray;
+	IntersectionData id;
+
+
+	for (i = 0; i < bounce_limit; i++)
+	{
+		
+		get_intersection_data(casted_ray, scene, id);
+
+		if (id.type == ObjectType::SKYBOX)
+		{
+			return_color += hadamard(weight , id.hit_material->emission_color);	
+			break;
+		}
+
+		f32 attenuation = dot(-casted_ray.direction, id.normal);
+		if (attenuation < 0)
+		{
+			id.normal = -id.normal;
+			attenuation = 0;
+		}
+
+		//reflected ray
+		vec3f pure_bounce;
+		pure_bounce = casted_ray.direction - (id.normal * (2 * dot(casted_ray.direction, id.normal)));
+		normalize(pure_bounce);
+			
+		//random ray
+		vec3f random_bounce = {rand_bi(rng_stream), rand_bi(rng_stream), rand_bi(rng_stream)};
+		random_bounce += id.normal;
+		normalize(random_bounce);
+
+		//final reflected ray
+		casted_ray.origin = casted_ray.at(id.distance_at_intersection);
+		casted_ray.direction = lerp(random_bounce, pure_bounce, id.hit_material->scatter);
+		normalize(casted_ray.direction);
+
+		//Shading
+		vec3f reflection_amount = id.hit_material->reflection_color;
+		return_color += hadamard(weight, id.hit_material->emission_color);
+		weight = hadamard(weight, id.hit_material->reflection_color * attenuation);
+	}
+	ray_casts += i;
+	return  return_color;
+}
+
+void prep_scene(Scene scene)
+{
+	for (int32 i = 0; i < scene.planes.length; i++)
+	{
+		normalize(scene.planes[i].normal);
+	}
+
+	/*for (int32 i = 0; i < scene.no_of_models; i++)
+	{
+		for (int32 j = 0; j < scene.models[i].no_of_triangles; j++)
+		{
+			vec3f ab = scene.models[i].triangles[j].a - scene.models[i].triangles[j].b;
+			vec3f ac = scene.models[i].triangles[j].a - scene.models[i].triangles[j].c;
+			scene.triangles[i].normal = cross(ab, ac);
+			normalize(scene.triangles[i].normal);
+		}
+	}*/
+}
 
 static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 {
@@ -45,26 +295,38 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 			vec3b pixel_color = {};
 			vec3f flt_pixel_color = {};
 			Ray ray = {};
+			vec3f pixel_pos;
 
 			if (info.camera->render_settings.anti_aliasing)
 			{
 				for (uint32 i = 0; i < info.camera->render_settings.samples_per_pixel; i++)
 				{
-					get_ray_from_camera(ray, *info.camera, film_x, film_y, rng_stream);
+					f32 x_off = rand_bi(rng_stream) * info.camera->half_pixel_width + film_x;
+					f32 y_off = rand_bi(rng_stream) * info.camera->half_pixel_height + film_y;
+					pixel_pos = info.camera->frame_center + (info.camera->camera_x * x_off) + (info.camera->camera_y * y_off);
+					SetRay(ray, info.camera->eye, pixel_pos);
+
 					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, ray_casts, rng_stream);
 				}
 			}
 			else
 			{
-				get_ray_from_camera(ray, *info.camera, film_x, film_y, rng_stream);
+				pixel_pos = info.camera->frame_center + (info.camera->camera_x * film_x) + (info.camera->camera_y * film_y);
+				SetRay(ray, info.camera->eye, pixel_pos);
+
 				for (uint32 i = 0; i < info.camera->render_settings.samples_per_pixel; i++)
 				{
 					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, ray_casts, rng_stream);
 				}
 			}
 			flt_pixel_color = flt_pixel_color / (f32)info.camera->render_settings.samples_per_pixel;
+
+			flt_pixel_color = clamp(flt_pixel_color, 0.0f, 1.0f);
+			//flt_pixel_color = rgb_gamma_correct(flt_pixel_color);
+			//flt_pixel_color = linear_to_srgb(flt_pixel_color);
 			pixel_color = rgb_float_to_byte(flt_pixel_color);
-			Set_Pixel(pixel_color,*info.camera_tex, x, y);
+
+			Set_Pixel(pixel_color, *info.camera_tex, x, y);
 		}
 	}
 
@@ -152,159 +414,3 @@ int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpo
 	return info.total_ray_casts;
 }
 
-
-static inline vec3f get_reflection(vec3f incident, vec3f normal)
-{
-	normalize(normal);
-	vec3f reflection = -(normal * (2 * dot(incident, normal))) + incident;
-	return reflection;
-}
-
-struct TriangleIntersectionData
-{
-	Model* model;
-	Face* face;
-	f32 u, v;
-};
-
-static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
-{
-
-	if (bounce_limit <= 0)
-	{
-		return {0,0,0};
-	}
-	ray_casts++;
-
-	f32 closest = MAX_FLOAT;
-	Sphere *nearest_sphere = nullptr;
-	Plane *nearest_plane = nullptr;
-	TriangleIntersectionData nearest_triangle = { 0 };
-
-	for (int32 i = 0; i < scene.models.length; i++)
-	{
-		for (uint32 j = 0; j < scene.models[i].data.faces.size; j++)
-		{
-			TriangleVertices tri;
-			tri.a = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[0]];
-			tri.b = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[1]];
-			tri.c = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[2]];
-
-			f32 u, v;
-			f32 t = get_triangle_ray_intersection_culled(ray,tri,u,v);
-			if (t > tolerance && t < closest)
-			{
-				closest = t;
-				nearest_triangle.u = u;
-				nearest_triangle.v = v;
-				nearest_triangle.model = &scene.models[i];
-				nearest_triangle.face = &scene.models[i].data.faces[j];
-			}
-		}
-
-	}
-
-	for (int i = 0; i < scene.spheres.length; i++)
-	{
-		Sphere* spr = &scene.spheres[i];
-
-		f32 t = get_sphere_ray_intersection(ray, *spr);
-		if (t > tolerance && t < closest)
-		{
-			closest = t;
-			nearest_sphere = spr;
-		}
-	}
-	for (int i = 0; i < scene.planes.length; i++)
-	{
-		Plane* pln = &scene.planes[i];
-
-		f32 t = get_plane_ray_intersection(ray, *pln);
-		if (t > tolerance && t < closest)
-		{
-			nearest_plane = pln;
-			closest = t;
-		}
-	}
-
-	Ray reflected;
-	Material material;
-	reflected.origin = ray.at(closest);
-	vec3f hit_normal;
-
-	//getting reflected normal
-	if (nearest_plane != nullptr)	//nearest hit is a plane
-	{
-		hit_normal = nearest_plane->normal;
-		material = *nearest_plane->material;
-	}
-	else if(nearest_sphere != nullptr)	//nearest hit is a sphere
-	{
-		hit_normal = reflected.origin - nearest_sphere->center;
-		normalize(hit_normal);
-		material = *nearest_sphere->material;
-	}
-	//just some code to test if intersection works
-	else if (nearest_triangle.model != nullptr)	//nearest hit is a triangle
-	{
-		vec3f normal_a, normal_b, normal_c;
-		if (nearest_triangle.model->data.normals.size > 0)
-		{
-			normal_a = nearest_triangle.model->data.normals[nearest_triangle.face->vertex_normals_indices[0]];
-			normal_b = nearest_triangle.model->data.normals[nearest_triangle.face->vertex_normals_indices[1]];
-			normal_c = nearest_triangle.model->data.normals[nearest_triangle.face->vertex_normals_indices[2]];
-
-			//Interpolating normals
-			hit_normal = normal_a * (1 - nearest_triangle.u - nearest_triangle.v)  + normal_b * nearest_triangle.u + normal_c * nearest_triangle.v;
-		}
-		else
-		{
-			vec3f ab = nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[0]] - nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[1]];
-			vec3f ac = nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[0]] - nearest_triangle.model->data.vertices[nearest_triangle.face->vertex_indices[2]];
-			hit_normal = cross(ab, ac);
-			normalize(hit_normal);
-		}
-		//For now, triangles are red.
-		material.color = {1,0,0};
-		material.specularity = 0.2f;
-	}
-	else
-	{
-		return scene.materials[0].color;
-	}
-
-	f32 attenuation = dot(ray.direction, hit_normal);
-	if (attenuation < 0)
-	{
-		hit_normal = -hit_normal;
-		attenuation = -attenuation;
-	}
-
-	reflected.direction = ray.direction -(hit_normal * (2 * attenuation));
-	normalize(reflected.direction);
-	
-	vec3f color = cast_ray(reflected, scene, bounce_limit - 1, ray_casts, rng_stream) * material.specularity + material.color * (1 - material.specularity);
-	color = color * attenuation;
-	//vec3f color = cast_ray(reflected,scene,bounce_no - 1)
-	
-	return  color;
-}
-
-void prep_scene(Scene scene)
-{
-	for (int32 i = 0; i < scene.planes.length; i++)
-	{
-		normalize(scene.planes[i].normal);
-	}
-
-	/*for (int32 i = 0; i < scene.no_of_models; i++)
-	{
-		for (int32 j = 0; j < scene.models[i].no_of_triangles; j++)
-		{
-			vec3f ab = scene.models[i].triangles[j].a - scene.models[i].triangles[j].b;
-			vec3f ac = scene.models[i].triangles[j].a - scene.models[i].triangles[j].c;
-			scene.triangles[i].normal = cross(ab, ac);
-			normalize(scene.triangles[i].normal);
-		}
-	}*/
-}
