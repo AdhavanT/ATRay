@@ -5,7 +5,7 @@ int main()
 {
 	Texture texture;
 
-	Setup_Texture(texture, TextureFileType::BMP,1920, 1080);
+	Setup_Texture(texture, TextureFileType::BMP,1270,720 );
 
 	ThreadPool thread_pool;
 	//thread_pool.threads.allocate(1);	//For single thread

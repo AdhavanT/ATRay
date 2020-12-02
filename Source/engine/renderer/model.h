@@ -1,6 +1,6 @@
 #pragma once
 #include "material.h"
-#include "box.h"
+#include "aabb.h"
 #include "ray.h"
 
 extern f32 tolerance;
@@ -12,9 +12,13 @@ struct TriangleVertices
 	vec3f c;
 };
 
-struct Face
+struct FaceVertices
 {
 	int32 vertex_indices[3] = { 0 };
+};
+
+struct FaceData
+{
 	int32 tex_coord_indices[3] = { 0 };
 	int32 vertex_normals_indices[3] = { 0 };
 };
@@ -22,10 +26,11 @@ struct Face
 struct ModelData
 {
 	Material* material;
-	FDBuffer<vec3f, uint32> vertices;
-	FDBuffer<vec3f, uint32> normals;
-	FDBuffer<vec3f, uint32> tex_coords;
-	FDBuffer<Face, uint32> faces;
+	FDBuffer<vec3f, uint32> vertices;				//list of vertices in model
+	FDBuffer<vec3f, uint32> normals;				//list of normals in model
+	FDBuffer<vec3f, uint32> tex_coords;				//list of texture coordinates in model
+	FDBuffer<FaceVertices, uint32> faces_vertices;	//list of face vertices 
+	FDBuffer<FaceData, uint32> faces_data;			//data for respective faces (same index for faces_vertices)
 };
 
 struct Model
@@ -80,7 +85,7 @@ inline AABB get_AABB(Model& mdl)
 		z_max = max(z_max, mdl.data.vertices[i].z);
 		z_min = min(z_min, mdl.data.vertices[i].z);
 	}
-	AABB ret;
+	AABB ret = {};
 	ret.max = { x_max,y_max,z_max };
 	ret.min = { x_min, y_min, z_min };
 	return (ret);
@@ -110,4 +115,7 @@ inline void translate_to(Model& mdl, AABB& aabb, vec3f new_center)
 	{
 		mdl.data.vertices[i] += translation;
 	}
+
+	aabb.max += translation;
+	aabb.min += translation;
 }

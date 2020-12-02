@@ -13,7 +13,7 @@ uint32 get_core_count()
 		GetSystemInfo(&sys_info);
 		core_count = sys_info.dwNumberOfProcessors;
 	}
-	return 8;
+	return core_count;
 }
 
  uint32 get_thread_id()

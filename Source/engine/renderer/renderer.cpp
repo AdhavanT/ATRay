@@ -20,16 +20,17 @@ static inline vec3f get_reflection(vec3f incident, vec3f normal)
 	return reflection;
 }
 
+
 struct TriangleIntersectionData
 {
 	Model* model;
-	Face* face;
+	uint32 face_index;
 	f32 u, v;
 };
 
 enum class ObjectType
 {
-	TRIANGLE, SPHERE, PLANE, SKYBOX
+	AABB,TRIANGLE, SPHERE, PLANE, SKYBOX
 };
 
 struct IntersectionData
@@ -48,27 +49,33 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 	Plane* nearest_plane = nullptr;
 	intersection_data.tid.model = nullptr;
 
+
 	for (int32 i = 0; i < scene.models.length; i++)
 	{
-		for (uint32 j = 0; j < scene.models[i].data.faces.size; j++)
+		uint32 face_data_index = -1;	//assumes number of faces for model is less than 4,294,967,295 (MAX of UINT32)
+		for (uint32 j = 0; j < scene.models[i].data.faces_vertices.size; j++)
 		{
 			TriangleVertices tri;
-			tri.a = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[0]];
-			tri.b = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[1]];
-			tri.c = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[2]];
+			tri.a = scene.models[i].data.vertices[scene.models[i].data.faces_vertices[j].vertex_indices[0]];
+			tri.b = scene.models[i].data.vertices[scene.models[i].data.faces_vertices[j].vertex_indices[1]];
+			tri.c = scene.models[i].data.vertices[scene.models[i].data.faces_vertices[j].vertex_indices[2]];
 
 			f32 u, v;
+			//TODO: check if passing by value or manually inlining is faster for checking intersection
 			f32 t = get_triangle_ray_intersection_culled(casted_ray, tri, u, v);
 			if (t > tolerance && t < closest)
 			{
 				closest = t;
 				intersection_data.tid.u = u;
 				intersection_data.tid.v = v;
-				intersection_data.tid.model = &scene.models[i];
-				intersection_data.tid.face = &scene.models[i].data.faces[j];
+				face_data_index = j;
 			}
 		}
-
+		if (face_data_index != -1)	//closest intersection was found for this model
+		{
+			intersection_data.tid.face_index = face_data_index;
+			intersection_data.tid.model = &scene.models[i];
+		}
 	}
 
 	for (int i = 0; i < scene.spheres.length; i++)
@@ -116,9 +123,10 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		vec3f normal_a, normal_b, normal_c;
 		if (intersection_data.tid.model->data.normals.size > 0)
 		{
-			normal_a = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[0]];
-			normal_b = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[1]];
-			normal_c = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[2]];
+			FaceData* face_data = &intersection_data.tid.model->data.faces_data[intersection_data.tid.face_index];
+			normal_a = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[0]];
+			normal_b = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[1]];;
+			normal_c = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[2]];;
 
 			//Interpolating normals
 			intersection_data.normal = normal_a * (1 - intersection_data.tid.u - intersection_data.tid.v) + normal_b * intersection_data.tid.u + normal_c * intersection_data.tid.v;
@@ -126,8 +134,9 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		//regular shading
 		else
 		{
-			vec3f ab = intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[0]] - intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[1]];
-			vec3f ac = intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[0]] - intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[2]];
+			FaceVertices* face_v = &intersection_data.tid.model->data.faces_vertices[intersection_data.tid.face_index];
+			vec3f ab = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[1]];
+			vec3f ac = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[2]];
 			intersection_data.normal = cross(ab, ac);
 		}
 		//TODO: set the material for 
@@ -292,8 +301,8 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 		{
 			f32 film_x = (-1.0f + 2.0f * ((f32)x / (f32)info.camera->render_settings.resolution.x)) * info.camera->h_fov * info.camera->aspect_ratio;
 
-			vec3b pixel_color = {};
-			vec3f flt_pixel_color = {};
+			vec3b pixel_color;
+			vec3f flt_pixel_color;
 			Ray ray = {};
 			vec3f pixel_pos;
 
@@ -334,8 +343,6 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 
 	return true;
 }
-
-
 
 static void start_tile_render_thread(void* data)
 {
