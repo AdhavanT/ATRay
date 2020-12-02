@@ -1,7 +1,6 @@
 #pragma once
 #include "utilities/types.h"
 #include "utilities/texture.h"
-#include "utilities/atp.h"
 #include "platform/platform.h"
 #include "engine/tools/work_queue.h"
 #include "scene.h"
