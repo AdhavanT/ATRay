@@ -351,15 +351,12 @@ static void start_tile_render_thread(void* data)
 	rng_stream.state = get_hardware_entropy();
 	rng_stream.stream = (uint64)get_thread_id();
 
-	while (render_tile_from_camera(*info, &rng_stream))
-	{
-		printf("\rTiles loaded: %i/%i", info->twq.jobs_done, info->twq.jobs.size);
-	}
+	while (render_tile_from_camera(*info, &rng_stream));
 }
 
 
 //Divides image into tiles and creates multiple threads to finish all tiles. 
-int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpool)
+int64 render_from_camera(PL& pl, Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpool)
 {
 	RenderInfo info;
 	info.camera_tex = &tex;
@@ -368,7 +365,7 @@ int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpo
 
 
 	//Creates a WorkQueue made of tiles
-	int32 tile_width = tex.bmb.width / get_core_count();	//ASSESS: which tile_width value gives best results
+	int32 tile_width = tex.bmb.width / pl.core_count;	//ASSESS: which tile_width value gives best results
 	int32 tile_height = tile_width;	// for square tiles
 
 	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= (int32)tex.bmb.height);
@@ -406,8 +403,30 @@ int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpo
 	}
 
 	activate_pool(tpool, start_tile_render_thread, &info);
-
+	int32 last_tile = 0;
+	while (info.twq.jobs.size > info.twq.jobs_done)
+	{
+		PL_poll_window(pl.window);
+		if (info.twq.jobs_done > last_tile)
+		{
+			char buffer[512];
+			format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width,pl.window.height, pl.core_count, info.twq.jobs_done, info.twq.jobs.size);
+			pl.window.title = buffer;
+			PL_push_window(pl.window, TRUE);
+			last_tile = info.twq.jobs_done;
+		}
+		else
+		{
+			PL_push_window(pl.window, FALSE);
+			sleep_thread(50);	//refreshing to see if any new tiles are finished every 33 milliseconds
+		}
+	}
+	char buffer[512];
+	format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width, pl.window.height, pl.core_count, info.twq.jobs_done, info.twq.jobs.size);
+	pl.window.title = buffer;
+	PL_push_window(pl.window, TRUE);
 	wait_for_pool(tpool);
+
 
 	if (info.twq.jobs_done == info.twq.jobs.size)
 	{

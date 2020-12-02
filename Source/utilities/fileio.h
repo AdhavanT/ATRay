@@ -1,5 +1,5 @@
 #pragma once
-#include <platform/platform.h>
+#include "PL/pl_utils.h"
 
 typedef signed char        int8;
 typedef short              int16;
@@ -18,7 +18,7 @@ typedef double f64;
 //-----------------------
 
 //Table for quick uint64 pow(10,x)
-static const uint64 INT_POWER_10[20] =
+constexpr uint64 INT_POWER_10[20] =
 {
 	1,
 	10,
@@ -43,10 +43,10 @@ static const uint64 INT_POWER_10[20] =
 };
 
 #define AT_POWER_10_OFFSET 28	//where 1.0 (1.0e0) is in POWER_10
-
+#define POWER_10(x) F64_POWER_10[AT_POWER_10_OFFSET + (x)]
 //Table for quick f64 pow(10,x)
-static const
-f64 POWER_10[48] =
+constexpr
+f64 F64_POWER_10[48] =
 {   1.0e-28,  1.0e-27,  1.0e-26,  1.0e-25,  1.0e-24,  1.0e-23,  1.0e-22,  1.0e-21,  1.0e-20,
 	1.0e-19,  1.0e-18,  1.0e-17,  1.0e-16,  1.0e-15,  1.0e-14,  1.0e-13,  1.0e-12,  1.0e-11,
 	1.0e-10,  1.0e-9,   1.0e-8,   1.0e-7,   1.0e-6,   1.0e-5,   1.0e-4,   1.0e-3,   1.0e-2, 
@@ -243,7 +243,7 @@ static inline char* parse_f64(char* from, f64& val)
 	val = (f64)front_num;
 	val = val * sign;
 	exponent = (exponent >= -AT_POWER_10_OFFSET && exponent <= 19) ? exponent : 0;
-	val *=  POWER_10[exponent + AT_POWER_10_OFFSET];
+	val *= F64_POWER_10[exponent + AT_POWER_10_OFFSET];
 	return from;
 }
 

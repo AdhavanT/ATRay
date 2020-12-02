@@ -182,7 +182,7 @@ static void start_parse_chunk_thread(void* chunks_)
 
 	while (parse_chunks(*chunks))
 	{
-		printf("\rChunks parsed: %i/%i", chunks->jobs_done, chunks->jobs.size);
+		debug_print("\rChunks parsed: %i/%i", chunks->jobs_done, chunks->jobs.size);
 	}
 }
 
@@ -277,18 +277,19 @@ static inline void clear_OBJ_Model_Load_Chunk_Data(OBJ_Model_Load_Chunk_Data& da
 
 void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 {
-	void* file = nullptr;
-	b32 opened = file_open(&file, file_name, "rb");
 
-	ASSERT(opened);	//Can't load file.
+	uint32 file_size = get_file_size((char*)file_name);
+	char* buffer_front = (char*)buffer_malloc(file_size + 1);
+	load_file_into(buffer_front, file_size, (char*)file_name);
 
-	uint32 file_size = get_file_size(file);
+	if (buffer_front[file_size - 1] != 0)
+	{
+		buffer_front[file_size] = 0;
+	}
 
 	int32 no_of_chunks = threadpool.threads.size;
 	
-	char* buffer_front = (char*)buffer_malloc(file_size + 1);
 
-	uint8 file_load = load_from_file(file, file_size, buffer_front);
 
 	int32 general_chunk_size = (file_size + (no_of_chunks - 1)) / no_of_chunks;
 	WorkQueue<ParseDataChunk>chunks;
@@ -350,6 +351,4 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	}
 
 
-	b32 closed = file_close(file);
-	ASSERT(closed);	//Can't close file
 }

@@ -1,4 +1,5 @@
-#include "app.h"
+#include "renderer/renderer.h"
+#include "utilities/texture.h"
 #include "utilities/ATP/atp.h"
 #include "engine/tools/OBJ_loader.h"
 
@@ -39,14 +40,60 @@ ATP_REGISTER(load_assets);
 ATP_REGISTER(prep_scene);
 ATP_REGISTER(render_from_camera);
 void print_out_tests();
+void render_app(PL& pl, Texture& texture, ThreadPool& tpool);
 
-void render_app(Texture& texture, ThreadPool& tpool)
+void PL_entry_point(PL& pl)
+{
+	pl.running = TRUE;
+	pl.core_count = 8;
+	Texture texture;
+	Setup_Texture(texture, TextureFileType::BMP, 1270, 720);
+
+	pl.window.height = texture.bmb.height;
+	pl.window.width = texture.bmb.width;
+	pl.window.title = (char*)"Starting Rendering...";
+	pl.window.window_bitmap.buffer = texture.bmb.buffer_memory;
+
+	ThreadPool thread_pool;
+	//thread_pool.threads.allocate(1);	//For single thread
+	thread_pool.threads.allocate(pl.core_count);
+
+	PL_initialize_input_keyboard(pl.input.kb);
+	PL_initialize_window(pl.window);
+	render_app(pl,texture, thread_pool);
+
+
+	while (pl.running)
+	{
+		pl.input.kb = {};
+		PL_poll_input_keyboard(pl.input.kb);
+		PL_poll_window(pl.window);
+		if (pl.input.keys[PL_KEY::SHIFT].down && pl.input.keys[PL_KEY::S].down)
+		{
+			Write_To_File(texture, "Results\\resultings");
+			pl.window.title = (char*)"SAVED TO FILE!";
+			PL_push_window(pl.window, TRUE);
+		}
+		if (pl.input.keys[PL_KEY::ESCAPE].down)
+		{
+			pl.running = FALSE;
+		}
+		else
+		{
+			PL_push_window(pl.window, FALSE);
+		}
+	}
+
+
+}
+
+void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 {
 	ATP_START(render_app);
 
 	ATP_START(load_assets);
 
-	printf("\nLoading Assets...\n");
+	debug_print("\nLoading Assets...\n");
 	
 	Model monkey;
 	load_model_data(monkey.data, "Assets\\Monkey.obj", tpool);
@@ -54,7 +101,7 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	resize_scale(monkey, monkey_scale, 2);
 	translate_to(monkey, monkey_scale, { 1.f,2.f,-3.f });
 
-	Model monkey_aabb = make_model_from_aabb(monkey_scale);
+	//Model monkey_aabb = make_model_from_aabb(monkey_scale);
 	ATP_END(load_assets);
 
 	Camera cm;
@@ -112,13 +159,13 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	pln[1].material = &scene.materials[4];
 
 	monkey.data.material = &scene.materials[5];
-	monkey_aabb.data.material = &scene.materials[6];
+	//monkey_aabb.data.material = &scene.materials[6];
 
 	AABB tmp = {};
 	tmp.min = { -0.5f,-0.5f,-3.5f };
 	tmp.max = { 0.5f,4.5f,-2.5f };
 
-	scene.models.add_nocpy(monkey_aabb);
+	//scene.models.add_nocpy(monkey_aabb);
 	scene.models.add_nocpy(monkey);
 	scene.planes.add(pln[0]);
 	scene.planes.add(pln[1]);
@@ -129,20 +176,30 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	prep_scene(scene);
 	ATP_END(prep_scene);
 
-	printf("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
+	debug_print("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
 	
 	ATP_START(render_from_camera);
-	int64 rays_shot = render_from_camera(cm, scene, texture, tpool);
+	int64 rays_shot = render_from_camera(pl,cm, scene, texture, tpool);
 	ATP_END(render_from_camera);
 
 	ATP_END(render_app);
 
-	printf("\nCompleted:\n");
+	monkey.data.faces_data.clear();
+	monkey.data.normals.clear();
+	monkey.data.tex_coords.clear();
+	monkey.data.faces_vertices.clear();
+
+	scene.materials.clear_buffer();
+	scene.models.clear_buffer();
+	scene.spheres.clear_buffer();
+	scene.planes.clear_buffer();
+
+	debug_print("\nCompleted:\n");
 	
 	print_out_tests();
 	
-	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
-	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)rays_shot);
+	debug_print("	Total Rays Shot: %I64i rays\n", rays_shot);
+	debug_print("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)rays_shot);
 
 }
 
@@ -153,7 +210,7 @@ void print_out_tests()
 	for (int i = 0; i < length; i++)
 	{
 		f64 ms = ATP::get_ms_from_test(*front);
-		printf("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n",front->name,3, ms, 4,ms/1000);
+		debug_print("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n",front->name,3, ms, 4,ms/1000);
 		front++;
 	}
 }
