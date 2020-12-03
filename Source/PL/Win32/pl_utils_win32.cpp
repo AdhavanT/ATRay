@@ -60,14 +60,14 @@ void close_threads(uint32 no_of_threads, const ThreadHandle* handles)
 	}
 }
 
-void wait_for_thread(const ThreadHandle* handle, uint32 timeout_in_ms)
+b32 wait_for_thread(const ThreadHandle* handle, uint32 timeout_in_ms)
 {
-	WaitForSingleObject((HANDLE*)handle, timeout_in_ms);
+	return WaitForSingleObject((HANDLE*)handle, timeout_in_ms);
 }
 
-void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms)
+b32 wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms)
 {
-	WaitForMultipleObjects(no_of_threads, (HANDLE*)handles, TRUE, timeout_in_ms);
+	return WaitForMultipleObjects(no_of_threads, (HANDLE*)handles, TRUE, timeout_in_ms);
 }
 
 
@@ -172,6 +172,13 @@ uint32 get_file_size(char* path)
 	}
 	
 	return end;
+}
+
+uint64 get_tsc()
+{
+	LARGE_INTEGER tsc;
+	QueryPerformanceCounter(&tsc);
+	return tsc.QuadPart;
 }
 
 void debug_print(const char* format, ...)

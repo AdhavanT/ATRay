@@ -9,8 +9,8 @@ struct AABB
         vec3f bounds[2];
         struct
         {
-            vec3f max;
             vec3f min;
+            vec3f max;
         };
     };
 };
@@ -34,7 +34,8 @@ static inline b32 get_ray_AABB_intersection(Ray& r, AABB& bb, vec3f inv_ray_d, v
 	{
 		return true;
 	}
-
+    
+    //optimized version 
     float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
     tmin = (bb.bounds[inv_signs[0]].x - r.origin.x) * inv_ray_d.x;
@@ -60,5 +61,42 @@ static inline b32 get_ray_AABB_intersection(Ray& r, AABB& bb, vec3f inv_ray_d, v
         tmax = tzmax;
 
     return true;
+
+    //better to understand what is going on
+    /*float tmin = (bb.min.x - r.origin.x) * inv_ray_d.x;
+    float tmax = (bb.max.x - r.origin.x) * inv_ray_d.x;
+
+    if (inv_ray_d.x < 0) swap(tmin, tmax);
+
+    float tymin = (bb.min.y - r.origin.y) * inv_ray_d.y;
+    float tymax = (bb.max.y - r.origin.y) * inv_ray_d.y;
+
+    if (inv_ray_d.y < 0) swap(tymin, tymax);
+
+    if ((tmin > tymax) || (tymin > tmax))
+        return false;
+
+    if (tymin > tmin)
+        tmin = tymin;
+
+    if (tymax < tmax)
+        tmax = tymax;
+
+    float tzmin = (bb.min.z - r.origin.z) * inv_ray_d.z;
+    float tzmax = (bb.max.z - r.origin.z) * inv_ray_d.z;
+
+    if (inv_ray_d.z < 0) swap(tzmin, tzmax);
+
+    if ((tmin > tzmax) || (tzmin > tmax))
+        return false;
+
+    if (tzmin > tmin)
+        tmin = tzmin;
+
+    if (tzmax < tmax)
+        tmax = tzmax;
+
+    return true;
+    */
 
 }

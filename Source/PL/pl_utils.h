@@ -29,11 +29,11 @@ void close_thread(const ThreadHandle* handle);
 //release thread handles
 void close_threads(uint32 no_of_threads, const ThreadHandle* handles);
 
-//Waits for thread to finish or timeout
-void wait_for_thread(const ThreadHandle* handle, uint32 timeout_in_ms);
+//Waits for thread to finish or timeout. Returns TRUE if wait is timed out, and FALSE if thread is finished
+b32 wait_for_thread(const ThreadHandle* handle, uint32 timeout_in_ms);
 
-//waits for all threads to be released
-void wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms);
+//waits for all threads to be released. Returns TRUE if wait is timed out, and FALSE if all threads are finished
+b32 wait_for_all_threads(uint32 no_of_threads, const ThreadHandle* handles, uint32 timeout_in_ms);
 
 //Sleep current thread
 void sleep_thread(uint32 timeout_in_ms);
@@ -76,6 +76,11 @@ void load_file_into(void* block_to_store_into, uint32 bytes_to_load, char* path)
 uint32 get_file_size(char* path);
 
 //--------------------------------------</FILE I/O>------------------------------------
+
+//--------------------------------------<TIMING>---------------------------------------
+
+uint64 get_tsc();
+//--------------------------------------</TIMING>--------------------------------------
 
 
 //--------------------------------------<DEBUG>----------------------------------------

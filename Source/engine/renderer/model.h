@@ -36,6 +36,7 @@ struct ModelData
 struct Model
 {	
 	ModelData data;			
+	AABB surrounding_aabb;
 };
 
 //Uses Moller-Trumbore intersection algorithm
@@ -92,8 +93,9 @@ inline AABB get_AABB(Model& mdl)
 }
 
 //Resizes the model into a max scale 
-inline void resize_scale(Model& mdl,AABB& bounding_box ,f32 new_max_scale)
+inline void resize_scale(Model& mdl ,f32 new_max_scale)
 {
+	AABB& bounding_box = mdl.surrounding_aabb;
 	f32 rescale_factor;
 	vec3f scale_range = bounding_box.max - bounding_box.min;
 	f32 max_scale = max(max(scale_range.x, scale_range.y), scale_range.z);
@@ -106,8 +108,10 @@ inline void resize_scale(Model& mdl,AABB& bounding_box ,f32 new_max_scale)
 	bounding_box.min = bounding_box.min * rescale_factor;
 }
 
-inline void translate_to(Model& mdl, AABB& aabb, vec3f new_center)
+inline void translate_to(Model& mdl, vec3f new_center)
 {
+	AABB& aabb = mdl.surrounding_aabb;
+
 	vec3f old_center = (aabb.max - aabb.min) / 2;
 	vec3f translation = new_center - old_center;
 

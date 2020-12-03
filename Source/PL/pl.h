@@ -257,7 +257,7 @@ struct PL_Input
 		PL_Digital_Button keys[PL_INPUT_KEYBOARD_MAX_KEYS];
 		PL_Input_Keyboard kb;
 	};
-	//PL_Input_Mouse mouse;
+	PL_Input_Mouse mouse;
 };
 
 struct PL_Audio
@@ -272,7 +272,7 @@ struct PL
 	b32 initialized;
 	b32 running;
 	PL_Input input;
-	//PL_Timing time;
+	PL_Timing time;
 	//PL_Audio audio;
 	PL_Window window;
 	void* general_memory;

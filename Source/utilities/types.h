@@ -295,7 +295,7 @@ struct Vec4
 			t w;
 		};
 		struct {
-			Vec2<t> left_top, right_bottom;
+			Vec2<t> left_bottom, right_top;
 		};
 		struct {
 			t r;
