@@ -191,7 +191,7 @@ void debug_print(const char* format, ...)
 	OutputDebugStringA(buffer);
 }
 
-void format_print(char* buffer, int32 buffer_size, const char* format, ...)
+void format_print(char* buffer, uint32 buffer_size, const char* format, ...)
 {
 	va_list arg_list;
 	va_start(arg_list, format);

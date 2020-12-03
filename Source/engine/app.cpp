@@ -78,7 +78,7 @@ static RenderTile* find_tile_covering_point(vec2i point, WorkQueue<RenderTile>& 
 	}
 	return 0;
 }
- 
+
 static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 {
 
@@ -101,7 +101,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	rs.anti_aliasing = TRUE;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
-	rs.samples_per_pixel = 32;
+	rs.samples_per_pixel = 1;
 	rs.bounce_limit = 5;
 
 
@@ -232,24 +232,24 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 				RenderTile* tile_on_mouse = find_tile_covering_point(point, info.twq);
 				if (tile_on_mouse != 0)
 				{
-					f32 tile_ms = ((f64)tile_on_mouse->cycles_to_render / (f64)pl.time.cycles_per_second) * 1000;
+					f64 tile_ms = ((f64)tile_on_mouse->cycles_to_render / (f64)pl.time.cycles_per_second) * 1000;
 					char buffer[512];
-					format_print(buffer, 512, "Rendered: rays cast on tile:%i64 | milliseconds to render tile:%.*f ms", tile_on_mouse->ray_casts, 3, tile_ms);
+					format_print(buffer, 512, "Rendered: milliseconds to render tile:%.*f ms | rays cast on tile:%i64  ", 3,tile_ms,tile_on_mouse->ray_casts);
 					pl.window.title = buffer;
 					PL_push_window(pl.window, TRUE);
 				}
 			}
 			//checking if mouse is still in the same tile as previous update (an optimization)
-			else if ((tile_on_mouse->tile.left_bottom.x >= point.x && tile_on_mouse->tile.left_bottom.y >= point.y &&
+			/*else if ((tile_on_mouse->tile.left_bottom.x >= point.x && tile_on_mouse->tile.left_bottom.y >= point.y &&
 				tile_on_mouse->tile.right_top.x <= point.x && tile_on_mouse->tile.right_top.y <= point.y))
 			{
 				RenderTile* tile_on_mouse = find_tile_covering_point(point, info.twq);
-				f32 tile_ms = (((f64)tile_on_mouse->cycles_to_render * 1000)/ (f64)pl.time.cycles_per_second);
+				f64 tile_ms = (((f64)tile_on_mouse->cycles_to_render * 1000)/ (f64)pl.time.cycles_per_second);
 				char buffer[512];
-				format_print(buffer, 512, "Rendered: rays cast on tile:%i64 | milliseconds to render tile:%.*f ms", tile_on_mouse->ray_casts, 3, tile_ms);
+				format_print(buffer, 512, "Rendered: rays cast on tile:%i64 | milliseconds to render tile:%f ms", tile_on_mouse->ray_casts,  tile_ms);
 				pl.window.title = buffer;
 				PL_push_window(pl.window, TRUE);
-			}
+			}*/
 			
 		}
 		else

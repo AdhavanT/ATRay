@@ -86,5 +86,5 @@ uint64 get_tsc();
 //--------------------------------------<DEBUG>----------------------------------------
 #include <cstdarg>
 void debug_print(const char* format, ...);
-void format_print(char* buffer, int32 buffer_size,const char* format, ...);
+void format_print(char* buffer, uint32 buffer_size,const char* format, ...);
 //--------------------------------------</DEBUG>---------------------------------------
