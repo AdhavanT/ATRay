@@ -1,6 +1,6 @@
 #pragma once
 #include "material.h"
-#include "box.h"
+#include "aabb.h"
 #include "ray.h"
 
 extern f32 tolerance;
@@ -12,9 +12,13 @@ struct TriangleVertices
 	vec3f c;
 };
 
-struct Face
+struct FaceVertices
 {
 	int32 vertex_indices[3] = { 0 };
+};
+
+struct FaceData
+{
 	int32 tex_coord_indices[3] = { 0 };
 	int32 vertex_normals_indices[3] = { 0 };
 };
@@ -22,15 +26,17 @@ struct Face
 struct ModelData
 {
 	Material* material;
-	FDBuffer<vec3f, uint32> vertices;
-	FDBuffer<vec3f, uint32> normals;
-	FDBuffer<vec3f, uint32> tex_coords;
-	FDBuffer<Face, uint32> faces;
+	FDBuffer<vec3f, uint32> vertices;				//list of vertices in model
+	FDBuffer<vec3f, uint32> normals;				//list of normals in model
+	FDBuffer<vec3f, uint32> tex_coords;				//list of texture coordinates in model
+	FDBuffer<FaceVertices, uint32> faces_vertices;	//list of face vertices 
+	FDBuffer<FaceData, uint32> faces_data;			//data for respective faces (same index for faces_vertices)
 };
 
 struct Model
 {	
 	ModelData data;			
+	AABB surrounding_aabb;
 };
 
 //Uses Moller-Trumbore intersection algorithm
@@ -80,15 +86,16 @@ inline AABB get_AABB(Model& mdl)
 		z_max = max(z_max, mdl.data.vertices[i].z);
 		z_min = min(z_min, mdl.data.vertices[i].z);
 	}
-	AABB ret;
+	AABB ret = {};
 	ret.max = { x_max,y_max,z_max };
 	ret.min = { x_min, y_min, z_min };
 	return (ret);
 }
 
 //Resizes the model into a max scale 
-inline void resize_scale(Model& mdl,AABB& bounding_box ,f32 new_max_scale)
+inline void resize_scale(Model& mdl ,f32 new_max_scale)
 {
+	AABB& bounding_box = mdl.surrounding_aabb;
 	f32 rescale_factor;
 	vec3f scale_range = bounding_box.max - bounding_box.min;
 	f32 max_scale = max(max(scale_range.x, scale_range.y), scale_range.z);
@@ -101,8 +108,10 @@ inline void resize_scale(Model& mdl,AABB& bounding_box ,f32 new_max_scale)
 	bounding_box.min = bounding_box.min * rescale_factor;
 }
 
-inline void translate_to(Model& mdl, AABB& aabb, vec3f new_center)
+inline void translate_to(Model& mdl, vec3f new_center)
 {
+	AABB& aabb = mdl.surrounding_aabb;
+
 	vec3f old_center = (aabb.max - aabb.min) / 2;
 	vec3f translation = new_center - old_center;
 
@@ -110,4 +119,7 @@ inline void translate_to(Model& mdl, AABB& aabb, vec3f new_center)
 	{
 		mdl.data.vertices[i] += translation;
 	}
+
+	aabb.max += translation;
+	aabb.min += translation;
 }

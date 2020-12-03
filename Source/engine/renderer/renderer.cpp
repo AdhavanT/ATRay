@@ -1,15 +1,5 @@
 #include "renderer.h"
 
-struct RenderInfo
-{
-	WorkQueue<Tile> twq;
-
-	Camera* camera;
-	Scene* scene;
-	Texture* camera_tex;
-
-	volatile int64 total_ray_casts = 0;
-};
 
 f32 tolerance = 0.0001f;
 
@@ -20,16 +10,17 @@ static inline vec3f get_reflection(vec3f incident, vec3f normal)
 	return reflection;
 }
 
+
 struct TriangleIntersectionData
 {
 	Model* model;
-	Face* face;
+	uint32 face_index;
 	f32 u, v;
 };
 
 enum class ObjectType
 {
-	TRIANGLE, SPHERE, PLANE, SKYBOX
+	AABB,TRIANGLE, SPHERE, PLANE, SKYBOX
 };
 
 struct IntersectionData
@@ -48,27 +39,37 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 	Plane* nearest_plane = nullptr;
 	intersection_data.tid.model = nullptr;
 
+	vec3f inv_dir = {1 / casted_ray.direction.x,1/casted_ray.direction.y, 1/casted_ray.direction.z};
+	vec3i sign = { inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0 };
 	for (int32 i = 0; i < scene.models.length; i++)
 	{
-		for (uint32 j = 0; j < scene.models[i].data.faces.size; j++)
+		if (get_ray_AABB_intersection(casted_ray, scene.models[i].surrounding_aabb, inv_dir, sign))
 		{
-			TriangleVertices tri;
-			tri.a = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[0]];
-			tri.b = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[1]];
-			tri.c = scene.models[i].data.vertices[scene.models[i].data.faces[j].vertex_indices[2]];
-
-			f32 u, v;
-			f32 t = get_triangle_ray_intersection_culled(casted_ray, tri, u, v);
-			if (t > tolerance && t < closest)
+			uint32 face_data_index = -1;	//assumes number of faces for model is less than 4,294,967,295 (MAX of UINT32)
+			for (uint32 j = 0; j < scene.models[i].data.faces_vertices.size; j++)
 			{
-				closest = t;
-				intersection_data.tid.u = u;
-				intersection_data.tid.v = v;
+				TriangleVertices tri;
+				tri.a = scene.models[i].data.vertices[scene.models[i].data.faces_vertices[j].vertex_indices[0]];
+				tri.b = scene.models[i].data.vertices[scene.models[i].data.faces_vertices[j].vertex_indices[1]];
+				tri.c = scene.models[i].data.vertices[scene.models[i].data.faces_vertices[j].vertex_indices[2]];
+
+				f32 u, v;
+				//TODO: check if passing by value or manually inlining is faster for checking intersection
+				f32 t = get_triangle_ray_intersection_culled(casted_ray, tri, u, v);
+				if (t > tolerance && t < closest)
+				{
+					closest = t;
+					intersection_data.tid.u = u;
+					intersection_data.tid.v = v;
+					face_data_index = j;
+				}
+			}
+			if (face_data_index != -1)	//closest intersection was found for this model
+			{
+				intersection_data.tid.face_index = face_data_index;
 				intersection_data.tid.model = &scene.models[i];
-				intersection_data.tid.face = &scene.models[i].data.faces[j];
 			}
 		}
-
 	}
 
 	for (int i = 0; i < scene.spheres.length; i++)
@@ -116,9 +117,10 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		vec3f normal_a, normal_b, normal_c;
 		if (intersection_data.tid.model->data.normals.size > 0)
 		{
-			normal_a = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[0]];
-			normal_b = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[1]];
-			normal_c = intersection_data.tid.model->data.normals[intersection_data.tid.face->vertex_normals_indices[2]];
+			FaceData* face_data = &intersection_data.tid.model->data.faces_data[intersection_data.tid.face_index];
+			normal_a = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[0]];
+			normal_b = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[1]];;
+			normal_c = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[2]];;
 
 			//Interpolating normals
 			intersection_data.normal = normal_a * (1 - intersection_data.tid.u - intersection_data.tid.v) + normal_b * intersection_data.tid.u + normal_c * intersection_data.tid.v;
@@ -126,8 +128,9 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		//regular shading
 		else
 		{
-			vec3f ab = intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[0]] - intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[1]];
-			vec3f ac = intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[0]] - intersection_data.tid.model->data.vertices[intersection_data.tid.face->vertex_indices[2]];
+			FaceVertices* face_v = &intersection_data.tid.model->data.faces_vertices[intersection_data.tid.face_index];
+			vec3f ab = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[1]];
+			vec3f ac = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[2]];
 			intersection_data.normal = cross(ab, ac);
 		}
 		//TODO: set the material for 
@@ -268,6 +271,7 @@ void prep_scene(Scene scene)
 
 static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 {
+	RenderTile* rt;
 	Tile* tile_;
 	int64 tile_no = interlocked_increment_i32(&info.twq.jobs_done);
 	if (tile_no > info.twq.jobs.size)
@@ -277,23 +281,25 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 	}
 	else
 	{
-		tile_ = &info.twq.jobs[(int32)tile_no - 1];
+		rt = &info.twq.jobs[(int32)tile_no - 1];
 	}
+	rt->cycles_to_render = get_tsc();
 
+	tile_ = &rt->tile;
 	vec3f pixel_pos;
-	int64 ray_casts = 0;
+	//int64 ray_casts = 0;
 
-	for (int32 y = tile_->left_top.y; y <= tile_->right_bottom.y; y++)
+	for (int32 y = tile_->left_bottom.y; y <= tile_->right_top.y; y++)
 	{
 
 		f32 film_y = -1.0f + 2.0f * ((f32)y / (f32)info.camera->render_settings.resolution.y);
 
-		for (int32 x = tile_->left_top.x; x <= tile_->right_bottom.x; x++)
+		for (int32 x = tile_->left_bottom.x; x <= tile_->right_top.x; x++)
 		{
 			f32 film_x = (-1.0f + 2.0f * ((f32)x / (f32)info.camera->render_settings.resolution.x)) * info.camera->h_fov * info.camera->aspect_ratio;
 
-			vec3b pixel_color = {};
-			vec3f flt_pixel_color = {};
+			vec3b pixel_color;
+			vec3f flt_pixel_color;
 			Ray ray = {};
 			vec3f pixel_pos;
 
@@ -306,7 +312,7 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 					pixel_pos = info.camera->frame_center + (info.camera->camera_x * x_off) + (info.camera->camera_y * y_off);
 					SetRay(ray, info.camera->eye, pixel_pos);
 
-					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, ray_casts, rng_stream);
+					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, rt->ray_casts, rng_stream);
 				}
 			}
 			else
@@ -316,7 +322,7 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 
 				for (uint32 i = 0; i < info.camera->render_settings.samples_per_pixel; i++)
 				{
-					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, ray_casts, rng_stream);
+					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, rt->ray_casts, rng_stream);
 				}
 			}
 			flt_pixel_color = flt_pixel_color / (f32)info.camera->render_settings.samples_per_pixel;
@@ -330,12 +336,9 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 		}
 	}
 
-	interlocked_add_i64(&info.total_ray_casts, ray_casts);
-
+	rt->cycles_to_render = get_tsc() - rt->cycles_to_render;
 	return true;
 }
-
-
 
 static void start_tile_render_thread(void* data)
 {
@@ -344,34 +347,26 @@ static void start_tile_render_thread(void* data)
 	rng_stream.state = get_hardware_entropy();
 	rng_stream.stream = (uint64)get_thread_id();
 
-	while (render_tile_from_camera(*info, &rng_stream))
-	{
-		printf("\rTiles loaded: %i/%i", info->twq.jobs_done, info->twq.jobs.size);
-	}
+	while (render_tile_from_camera(*info, &rng_stream));
 }
 
 
 //Divides image into tiles and creates multiple threads to finish all tiles. 
-int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpool)
+void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 {
-	RenderInfo info;
-	info.camera_tex = &tex;
-	info.camera = &cm;
-	info.scene = &scene;
-
-
-	//Creates a WorkQueue made of tiles
-	int32 tile_width = tex.bmb.width / get_core_count();	//ASSESS: which tile_width value gives best results
+	
+	//Creates a WorkQueue made of RenderTiles
+	int32 tile_width = info.camera_tex->bmb.width / tpool.threads.size;	//ASSESS: which tile_width value gives best results
 	int32 tile_height = tile_width;	// for square tiles
 
-	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= (int32)tex.bmb.height);
+	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= (int32)info.camera_tex->bmb.height);
 
-	int32 no_x_tiles = (tex.bmb.width + tile_width - 1) / tile_width;
-	int32 no_y_tiles = (tex.bmb.height + tile_height - 1) / tile_height;
+	int32 no_x_tiles = (info.camera_tex->bmb.width + tile_width - 1) / tile_width;
+	int32 no_y_tiles = (info.camera_tex->bmb.height + tile_height - 1) / tile_height;
 
 	int32 total_tiles = no_y_tiles * no_x_tiles;
 
-	Tile* tmp = info.twq.jobs.allocate(total_tiles);
+	RenderTile* tmp = info.twq.jobs.allocate(total_tiles);
 	info.twq.jobs_done = 0;
 
 	//Creates the "tiles" and adds it into a "tile_work_queue"
@@ -384,33 +379,38 @@ int64 render_from_camera(Camera& cm, Scene& scene, Texture& tex, ThreadPool& tpo
 			miny = y * tile_height;
 			maxx = minx + tile_width;
 			maxy = miny + tile_height;
-			if (maxx > tex.bmb.width - 1)
+			if (maxx > info.camera_tex->bmb.width - 1)
 			{
-				maxx = (tex.bmb.width - 1);
+				maxx = (info.camera_tex->bmb.width - 1);
 			}
-			if (maxy > tex.bmb.height - 1)
+			if (maxy > info.camera_tex->bmb.height - 1)
 			{
-				maxy = (tex.bmb.height - 1);
+				maxy = (info.camera_tex->bmb.height - 1);
 			}
-			tmp->left_top = { (int32)minx, (int32)miny };
-			tmp->right_bottom = { (int32)maxx, (int32)maxy };
+			tmp->tile.left_bottom = { (int32)minx, (int32)miny };
+			tmp->tile.right_top = { (int32)maxx, (int32)maxy };
 			tmp++;
 		}
 	}
 
 	activate_pool(tpool, start_tile_render_thread, &info);
+	
+}
 
-	wait_for_pool(tpool);
-
-	if (info.twq.jobs_done == info.twq.jobs.size)
+b32 wait_for_render_from_camera_to_finish(RenderInfo& info,ThreadPool& tpool, uint32 ms_to_wait_for)
+{
+	if (wait_for_all_threads(tpool.threads.size, &tpool.threads[0].handle, ms_to_wait_for))
 	{
-		info.twq.jobs.clear();
+		return TRUE;
 	}
 	else
 	{
-		ASSERT(false);	//All tiles not rendered!
+		close_threads(tpool.threads.size, &tpool.threads[0].handle);
+
+		for (int i = 0; i < info.twq.jobs.size; i++)
+		{
+			info.total_ray_casts += info.twq.jobs[i].ray_casts;
+		}
+		return FALSE;
 	}
-
-	return info.total_ray_casts;
 }
-

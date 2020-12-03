@@ -1,45 +1,111 @@
-#include "app.h"
-#include "utilities/atp.h"
+#include "renderer/renderer.h"
+#include "utilities/texture.h"
+#include "utilities/ATP/atp.h"
 #include "engine/tools/OBJ_loader.h"
 
+//TODO: remove this. This is for debug purposes. 
+static Model make_model_from_aabb(AABB box)
+{
+	Model mdl = {};
+	int32 no_faces = 6 * 2;
+	int32 no_vertices = 8;
+	mdl.data.faces_vertices.allocate(no_faces);
+	mdl.data.vertices.allocate(no_vertices);
+	mdl.data.vertices[0] = box.min;
+	mdl.data.vertices[1] = { box.max.x, box.min.y,box.min.z };
+	mdl.data.vertices[2] = { box.min.x, box.max.y,box.min.z };
+	mdl.data.vertices[3] = { box.max.x, box.max.y,box.min.z };
+	mdl.data.vertices[4] = { box.min.x, box.min.y,box.max.z };
+	mdl.data.vertices[5] = { box.max.x, box.min.y,box.max.z };
+	mdl.data.vertices[6] = { box.min.x, box.max.y,box.max.z };
+	mdl.data.vertices[7] = box.max;
 
-ATP_REGISTER(render_app);
+	mdl.data.faces_vertices[0] = { 0,1,3 };
+	mdl.data.faces_vertices[1] = { 0,3,2 };
+	mdl.data.faces_vertices[2] = { 1,5,4 };
+	mdl.data.faces_vertices[3] = { 1,4,0 };
+	mdl.data.faces_vertices[4] = { 2,6,4 };
+	mdl.data.faces_vertices[5] = { 2,4,0 };
+	mdl.data.faces_vertices[6] = { 3,6,2 };
+	mdl.data.faces_vertices[7] = { 3,7,6 };
+	mdl.data.faces_vertices[8] = { 4,5,7 };
+	mdl.data.faces_vertices[9] = { 4,7,6 };
+	mdl.data.faces_vertices[10] = { 5,7,3 };
+	mdl.data.faces_vertices[11] = { 5,3,1 };
+	return mdl;
+}
+
 ATP_REGISTER(load_assets);
 ATP_REGISTER(prep_scene);
 ATP_REGISTER(render_from_camera);
-
 void print_out_tests();
+void render_app(PL& pl, Texture& texture, ThreadPool& tpool);
 
-void render_app(Texture& texture, ThreadPool& tpool)
+void PL_entry_point(PL& pl)
 {
-	ATP_START(render_app);
+	pl.running = TRUE;
+	pl.core_count = 8;
+	Texture texture;
+	Setup_Texture(texture, TextureFileType::BMP, 1270, 720);
+
+	pl.window.height = texture.bmb.height;
+	pl.window.width = texture.bmb.width;
+	pl.window.title = (char*)"Starting Rendering...";
+	pl.window.window_bitmap.buffer = texture.bmb.buffer_memory;
+
+	ThreadPool thread_pool;
+	//thread_pool.threads.allocate(1);	//For single thread
+	thread_pool.threads.allocate(pl.core_count);
+
+	PL_initialize_input_keyboard(pl.input.kb);
+	PL_initialize_input_mouse(pl.input.mouse);
+	PL_initialize_window(pl.window);
+	PL_initialize_timing(pl.time);
+	render_app(pl,texture, thread_pool);
+
+
+}
+
+static RenderTile* find_tile_covering_point(vec2i point, WorkQueue<RenderTile>& twq)
+{
+	for (int i = 0; i < twq.jobs.size; i++)
+	{
+		if (twq.jobs[i].tile.left_bottom.x <= point.x && twq.jobs[i].tile.left_bottom.y <= point.y &&
+			twq.jobs[i].tile.right_top.x >= point.x && twq.jobs[i].tile.right_top.y >= point.y)
+		{
+			return &twq.jobs[i];
+		}
+	}
+	return 0;
+}
+
+static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
+{
 
 	ATP_START(load_assets);
 
-	printf("\nLoading Assets...\n");
-	Model deer;
-	load_model_data(deer.data, "Assets\\Deer.obj", tpool);
-	AABB deer_scale = get_AABB(deer);
-	resize_scale(deer, deer_scale, 2);
-	translate_to(deer, deer_scale, { 1.f,2.f,-4.f });
-
-	Model monkey;
+	debug_print("\nLoading Assets...\n");
+	
+	Model monkey = {};
 	load_model_data(monkey.data, "Assets\\Monkey.obj", tpool);
-	AABB monkey_scale = get_AABB(deer);
-	resize_scale(monkey, monkey_scale, 2);
-	translate_to(monkey, monkey_scale, { 1.f,2.f,-3.f });
+	monkey.surrounding_aabb = get_AABB(monkey);
+	resize_scale(monkey, 2);
+	translate_to(monkey, { 1.f,2.f,-3.f });
+
+	//Model monkey_aabb = make_model_from_aabb(monkey_scale);
 	ATP_END(load_assets);
 
 	Camera cm;
 	RenderSettings rs;
 	rs.no_of_threads = tpool.threads.size;
-	rs.anti_aliasing = true;
+	rs.anti_aliasing = TRUE;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
 	rs.samples_per_pixel = 1;
 	rs.bounce_limit = 5;
 
-	set_camera(cm, { 0.f,1.f,0.f }, { 0.f, 0.0f,-1.f }, rs, 1.0f);
+
+	set_camera(cm, { 0.f,4.f,0.f }, { 0.f, -1.f,-1.f }, rs, 1.0f);
 
 	Scene scene;
 	Material skybox = { {0.3f,0.4f,0.5f}, {0.2f,0.3f,0.4f},0.3f };
@@ -48,6 +114,7 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	Material plane_2 = { { 0.0f, 0.4f,0.6f } , { 0.2f, 0.3f,0.2f },0.f };
 	Material ground_plane = { {0.f, 0.f,0.0f } , {0.5f, 0.5f,0.5f },0.f };
 	Material model = { {0.4f,0.2f,0.2f}, {0.92f,0.5f,0.0f},0.3f };
+	Material mat_model_aabb = { {0.8f,0.2f,0.2f}, {0.92f,0.0f,0.0f},0.3f };
 
 	scene.materials.add(skybox);	//The first material is the skybox
 	scene.materials.add(sphere_1);
@@ -55,6 +122,7 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	scene.materials.add(plane_2);
 	scene.materials.add(ground_plane);
 	scene.materials.add(model);
+	scene.materials.add(mat_model_aabb);
 
 	//NOTE: this stuff is ad-hoc right now and should be properly implemented. 
 	//Should Objects contain a pointer to a material or should they have an "index" instead...
@@ -82,42 +150,147 @@ void render_app(Texture& texture, ThreadPool& tpool)
 	pln[1].material = &scene.materials[4];
 
 	monkey.data.material = &scene.materials[5];
+	//monkey_aabb.data.material = &scene.materials[6];
 
+	AABB tmp = {};
+	tmp.min = { -0.5f,-0.5f,-3.5f };
+	tmp.max = { 0.5f,4.5f,-2.5f };
+
+	//scene.models.add_nocpy(monkey_aabb);
 	//scene.models.add_nocpy(monkey);
 	scene.planes.add(pln[0]);
 	scene.planes.add(pln[1]);
 	scene.spheres.add(spr[0]);
 	scene.spheres.add(spr[1]);
 
-	
 	ATP_START(prep_scene);
 	prep_scene(scene);
 	ATP_END(prep_scene);
 
-	printf("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
+	debug_print("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
 	
+	RenderInfo info;
+	info.camera_tex = &texture;
+	info.camera = &cm;
+	info.scene = &scene;
+
 	ATP_START(render_from_camera);
-	int64 rays_shot = render_from_camera(cm, scene, texture, tpool);
+	start_render_from_camera(info, tpool);
+
+	int32 last_tile = 0;
+	while (wait_for_render_from_camera_to_finish(info, tpool, 33))	//checks if threadpool is finished every 33 milliseconds and exists when done.
+	{
+		PL_poll_window(pl.window);
+		if (info.twq.jobs_done > last_tile)
+		{
+			char buffer[512];
+			format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width, pl.window.height, pl.core_count, info.twq.jobs_done, info.twq.jobs.size);
+			pl.window.title = buffer;
+			PL_push_window(pl.window, TRUE);
+			last_tile = info.twq.jobs_done;
+		}
+		else
+		{
+			PL_push_window(pl.window, FALSE);
+		}
+	}
 	ATP_END(render_from_camera);
+	
 
-	ATP_END(render_app);
-
-	printf("\nCompleted:\n");
+	debug_print("\nCompleted:\n");
 	
 	print_out_tests();
 	
-	printf("	Total Rays Shot: %I64i rays\n", rays_shot);
-	printf("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)rays_shot);
+	debug_print("	Total Rays Shot: %I64i rays\n", info.total_ray_casts);
+	debug_print("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)info.total_ray_casts);
+
+	RenderTile* tile_on_mouse = 0;
+	while (pl.running)
+	{
+
+		PL_poll_window(pl.window);
+		PL_poll_input_keyboard(pl.input.kb);
+		PL_poll_input_mouse(pl.input.mouse, pl.window);
+		
+		if (pl.input.keys[PL_KEY::SHIFT].down && pl.input.keys[PL_KEY::S].down)
+		{
+			Write_To_File(texture, "Results\\resultings");
+			pl.window.title = (char*)"SAVED TO FILE!";
+			PL_push_window(pl.window, TRUE);
+		}
+		if (pl.input.keys[PL_KEY::ESCAPE].pressed)
+		{
+			pl.running = FALSE;
+		}
+		
+		if (pl.input.mouse.left.down && pl.input.mouse.is_in_window)
+		{
+			vec2i point = { pl.input.mouse.position_x, pl.input.mouse.position_y };
+			
+			if (tile_on_mouse == 0)
+			{
+				RenderTile* tile_on_mouse = find_tile_covering_point(point, info.twq);
+				if (tile_on_mouse != 0)
+				{
+					f64 tile_ms = ((f64)tile_on_mouse->cycles_to_render / (f64)pl.time.cycles_per_second) * 1000;
+					char buffer[512];
+					format_print(buffer, 512, "Rendered: milliseconds to render tile:%.*f ms | rays cast on tile:%i64  ", 3,tile_ms,tile_on_mouse->ray_casts);
+					pl.window.title = buffer;
+					PL_push_window(pl.window, TRUE);
+				}
+			}
+			//checking if mouse is still in the same tile as previous update (an optimization)
+			/*else if ((tile_on_mouse->tile.left_bottom.x >= point.x && tile_on_mouse->tile.left_bottom.y >= point.y &&
+				tile_on_mouse->tile.right_top.x <= point.x && tile_on_mouse->tile.right_top.y <= point.y))
+			{
+				RenderTile* tile_on_mouse = find_tile_covering_point(point, info.twq);
+				f64 tile_ms = (((f64)tile_on_mouse->cycles_to_render * 1000)/ (f64)pl.time.cycles_per_second);
+				char buffer[512];
+				format_print(buffer, 512, "Rendered: rays cast on tile:%i64 | milliseconds to render tile:%f ms", tile_on_mouse->ray_casts,  tile_ms);
+				pl.window.title = buffer;
+				PL_push_window(pl.window, TRUE);
+			}*/
+			
+		}
+		else
+		{
+			PL_push_window(pl.window, FALSE);
+		}
+		
+	}
+
+
+	if (info.twq.jobs_done == info.twq.jobs.size)
+	{
+		info.twq.jobs.clear();
+	}
+	else
+	{
+		ASSERT(false);	//All tiles not rendered!
+	}
+
+
+	monkey.data.faces_data.clear();
+	monkey.data.normals.clear();
+	monkey.data.tex_coords.clear();
+	monkey.data.faces_vertices.clear();
+
+	scene.materials.clear_buffer();
+	scene.models.clear_buffer();
+	scene.spheres.clear_buffer();
+	scene.planes.clear_buffer();
 
 }
 
-void print_out_tests()
+
+static void print_out_tests()
 {
 	int32 length;
 	ATP::TestType* front = ATP::get_testtype_registry(length);
 	for (int i = 0; i < length; i++)
 	{
-		printf("	Time Elapsed(ATP->%s):%.*f ms\n",front->name,3, ATP::get_ms_from_test(*front));
+		f64 ms = ATP::get_ms_from_test(*front);
+		debug_print("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n",front->name,3, ms, 4,ms/1000);
 		front++;
 	}
 }

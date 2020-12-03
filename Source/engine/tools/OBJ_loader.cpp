@@ -13,7 +13,9 @@ struct OBJ_Model_Load_Chunk_Data
 	DBuffer<vec3f, 50, 100, uint32> vertices;
 	DBuffer<vec3f, 50, 100, uint32> normals;
 	DBuffer<vec3f, 50, 100, uint32> tex_coords;
-	DBuffer<Face, 20, 50, uint32> faces;
+	DBuffer<FaceVertices, 20, 50, uint32> faces_vertices;
+	DBuffer<FaceData, 20, 50, uint32> faces_data;
+
 };
 
 struct ParseDataChunk
@@ -42,7 +44,7 @@ static bool parse_chunks(WorkQueue<ParseDataChunk>& chunks_)
 	}
 
 	char* cursor = chunk->start;
-	vec3f parsed_vec3f = {};
+	vec3f parsed_vec3f;
 	while (cursor < chunk->end)
 	{
 		switch (*cursor)
@@ -74,69 +76,74 @@ static bool parse_chunks(WorkQueue<ParseDataChunk>& chunks_)
 		}
 		case 'f':
 
-		{	cursor++;
-			Face tmp;
+		{	
+		cursor++;
 
-			cursor = parse_int(cursor, tmp.vertex_indices[0]);				//getting v0
-			if (*cursor == '/')
-			{
-				cursor++;
-				if (*cursor == '/')
-				{
-					cursor++;
-					cursor = parse_int(cursor, tmp.vertex_normals_indices[0]);  //To parse v0//vn0 format
-				}
-				else
-				{
-					cursor = parse_int(cursor, tmp.tex_coord_indices[0]);	//To parse v0/vt0 format
-					if (*cursor == '/')
-					{
-						cursor++;
-						cursor = parse_int(cursor, tmp.vertex_normals_indices[0]);//To parse v0/vt0/vn0 format
-					}
-				}
-			}
+		FaceVertices tmp_v;
+		FaceData tmp_d;
 
-			cursor = parse_int(cursor, tmp.vertex_indices[1]);
+		cursor = parse_int(cursor, tmp_v.vertex_indices[0]);				//getting v0
+		if (*cursor == '/')
+		{
+			cursor++;
 			if (*cursor == '/')
 			{
 				cursor++;
+				cursor = parse_int(cursor, tmp_d.vertex_normals_indices[0]);  //To parse v0//vn0 format
+			}
+			else
+			{
+				cursor = parse_int(cursor, tmp_d.tex_coord_indices[0]);	//To parse v0/vt0 format
 				if (*cursor == '/')
 				{
 					cursor++;
-					cursor = parse_int(cursor, tmp.vertex_normals_indices[1]);
-				}
-				else
-				{
-					cursor = parse_int(cursor, tmp.tex_coord_indices[1]);
-					if (*cursor == '/')
-					{
-						cursor++;
-						cursor = parse_int(cursor, tmp.vertex_normals_indices[1]);
-					}
+					cursor = parse_int(cursor, tmp_d.vertex_normals_indices[0]);//To parse v0/vt0/vn0 format
 				}
 			}
-			cursor = parse_int(cursor, tmp.vertex_indices[2]);
+		}
+
+		cursor = parse_int(cursor, tmp_v.vertex_indices[1]);
+		if (*cursor == '/')
+		{
+			cursor++;
 			if (*cursor == '/')
 			{
 				cursor++;
+				cursor = parse_int(cursor, tmp_d.vertex_normals_indices[1]);
+			}
+			else
+			{
+				cursor = parse_int(cursor, tmp_d.tex_coord_indices[1]);
 				if (*cursor == '/')
 				{
 					cursor++;
-					cursor = parse_int(cursor, tmp.vertex_normals_indices[2]);
-				}
-				else
-				{
-					cursor = parse_int(cursor, tmp.tex_coord_indices[2]);
-					if (*cursor == '/')
-					{
-						cursor++;
-						cursor = parse_int(cursor, tmp.vertex_normals_indices[2]);
-					}
+					cursor = parse_int(cursor, tmp_d.vertex_normals_indices[1]);
 				}
 			}
-			chunk->chunk_data.faces.add_nocpy(tmp);
-			break;
+		}
+		cursor = parse_int(cursor, tmp_v.vertex_indices[2]);
+		if (*cursor == '/')
+		{
+			cursor++;
+			if (*cursor == '/')
+			{
+				cursor++;
+				cursor = parse_int(cursor, tmp_d.vertex_normals_indices[2]);
+			}
+			else
+			{
+				cursor = parse_int(cursor, tmp_d.tex_coord_indices[2]);
+				if (*cursor == '/')
+				{
+					cursor++;
+					cursor = parse_int(cursor, tmp_d.vertex_normals_indices[2]);
+				}
+			}
+		}
+		chunk->chunk_data.faces_data.add_nocpy(tmp_d);
+		chunk->chunk_data.faces_vertices.add_nocpy(tmp_v);
+
+		break;
 		}
 
 		case 'u':
@@ -175,7 +182,7 @@ static void start_parse_chunk_thread(void* chunks_)
 
 	while (parse_chunks(*chunks))
 	{
-		printf("\rChunks parsed: %i/%i", chunks->jobs_done, chunks->jobs.size);
+		debug_print("\rChunks parsed: %i/%i", chunks->jobs_done, chunks->jobs.size);
 	}
 }
 
@@ -190,7 +197,7 @@ static void join_chunks(WorkQueue<ParseDataChunk>& chunks_, ModelData& chunk)
 
 	for (int i = 0; i < chunks_.jobs.size; i++)
 	{
-		no_faces += chunks_.jobs[i].chunk_data.faces.length;
+		no_faces += chunks_.jobs[i].chunk_data.faces_vertices.length;
 		no_normals += chunks_.jobs[i].chunk_data.normals.length;
 		no_vertices += chunks_.jobs[i].chunk_data.vertices.length;
 		no_tex_coords += chunks_.jobs[i].chunk_data.tex_coords.length;
@@ -199,65 +206,70 @@ static void join_chunks(WorkQueue<ParseDataChunk>& chunks_, ModelData& chunk)
 	vec3f* ptr_tex_chunk = chunk.tex_coords.allocate(no_tex_coords);
 	vec3f* ptr_nor_chunk = chunk.normals.allocate(no_normals);
 	vec3f* ptr_vert_chunk = chunk.vertices.allocate(no_vertices);
-	Face* ptr_face_chunk = chunk.faces.allocate(no_faces);
+	FaceVertices* ptr_face_chunk = chunk.faces_vertices.allocate(no_faces);
+	FaceData* ptr_face_data_chunk = chunk.faces_data.allocate(no_faces);
+
 
 	for (int i = 0; i < chunks_.jobs.size; i++)
 	{
 		buffer_copy(ptr_tex_chunk, chunks_.jobs[i].chunk_data.tex_coords.front, chunks_.jobs[i].chunk_data.tex_coords.length * sizeof(vec3f));
 		buffer_copy(ptr_nor_chunk, chunks_.jobs[i].chunk_data.normals.front, chunks_.jobs[i].chunk_data.normals.length * sizeof(vec3f));
 		buffer_copy(ptr_vert_chunk, chunks_.jobs[i].chunk_data.vertices.front, chunks_.jobs[i].chunk_data.vertices.length * sizeof(vec3f));
-		buffer_copy(ptr_face_chunk, chunks_.jobs[i].chunk_data.faces.front, chunks_.jobs[i].chunk_data.faces.length * sizeof(Face));
-		ptr_face_chunk += chunks_.jobs[i].chunk_data.faces.length;
+		buffer_copy(ptr_face_chunk, chunks_.jobs[i].chunk_data.faces_vertices.front, chunks_.jobs[i].chunk_data.faces_vertices.length * sizeof(FaceVertices));
+		buffer_copy(ptr_face_data_chunk, chunks_.jobs[i].chunk_data.faces_data.front, chunks_.jobs[i].chunk_data.faces_data.length * sizeof(FaceData));
+
+		ptr_face_chunk += chunks_.jobs[i].chunk_data.faces_vertices.length;
+		ptr_face_data_chunk += chunks_.jobs[i].chunk_data.faces_data.length;
 		ptr_nor_chunk += chunks_.jobs[i].chunk_data.normals.length;
 		ptr_vert_chunk += chunks_.jobs[i].chunk_data.vertices.length;
 		ptr_tex_chunk += chunks_.jobs[i].chunk_data.tex_coords.length;
 	}
-
 }
 
 static void prep_model_data(ModelData& mdl)
 {
 	//Making all the negative indicies proper. (negative indicies are relative to the end of the list)
-	for (uint32 i = 0; i < mdl.faces.size; i++)
+	for (uint32 i = 0; i < mdl.faces_data.size; i++)
 	{
 		for (int j = 0; j < 3; j++)
 		{
-			if (mdl.faces[i].tex_coord_indices[j] < 0)
+			if (mdl.faces_data[i].tex_coord_indices[j] < 0)
 			{
-				mdl.faces[i].tex_coord_indices[j] = mdl.tex_coords.size + mdl.faces[i].tex_coord_indices[j] + 1;
+				mdl.faces_data[i].tex_coord_indices[j] = mdl.tex_coords.size + mdl.faces_data[i].tex_coord_indices[j] + 1;
 			}
-			if (mdl.faces[i].vertex_normals_indices[j] < 0)
+			if (mdl.faces_data[i].vertex_normals_indices[j] < 0)
 			{
-				mdl.faces[i].vertex_normals_indices[j] = mdl.normals.size + mdl.faces[i].vertex_normals_indices[j] + 1;
+				mdl.faces_data[i].vertex_normals_indices[j] = mdl.normals.size + mdl.faces_data[i].vertex_normals_indices[j] + 1;
 			}
-			if (mdl.faces[i].vertex_indices[j] < 0)
+			if (mdl.faces_vertices[i].vertex_indices[j] < 0)
 			{
-				mdl.faces[i].vertex_indices[j] = mdl.vertices.size + mdl.faces[i].vertex_indices[j] + 1;
+				mdl.faces_vertices[i].vertex_indices[j] = mdl.vertices.size + mdl.faces_vertices[i].vertex_indices[j] + 1;
 			}
 		}
 	}
 
 	//Removing the +1 offset from indicies
 	//NOTE: still makes missing Face data into -1. 
-	for (uint32 i = 0; i < mdl.faces.size; i++)
+	for (uint32 i = 0; i < mdl.faces_data.size; i++)
 	{
-		mdl.faces[i].tex_coord_indices[0]--;
-		mdl.faces[i].tex_coord_indices[1]--;
-		mdl.faces[i].tex_coord_indices[2]--;
-		
-		mdl.faces[i].vertex_indices[0]--;
-		mdl.faces[i].vertex_indices[1]--;
-		mdl.faces[i].vertex_indices[2]--;
+		mdl.faces_data[i].tex_coord_indices[0]--;
+		mdl.faces_data[i].tex_coord_indices[1]--;
+		mdl.faces_data[i].tex_coord_indices[2]--;
 
-		mdl.faces[i].vertex_normals_indices[0]--;
-		mdl.faces[i].vertex_normals_indices[1]--;
-		mdl.faces[i].vertex_normals_indices[2]--;
+		mdl.faces_vertices[i].vertex_indices[0]--;
+		mdl.faces_vertices[i].vertex_indices[1]--;
+		mdl.faces_vertices[i].vertex_indices[2]--;
+
+		mdl.faces_data[i].vertex_normals_indices[0]--;
+		mdl.faces_data[i].vertex_normals_indices[1]--;
+		mdl.faces_data[i].vertex_normals_indices[2]--;
 	}
 }
 
 static inline void clear_OBJ_Model_Load_Chunk_Data(OBJ_Model_Load_Chunk_Data& data)
 {
-	data.faces.clear_buffer();
+	data.faces_data.clear_buffer();
+	data.faces_vertices.clear_buffer();
 	data.normals.clear_buffer();
 	data.tex_coords.clear_buffer();
 	data.vertices.clear_buffer();
@@ -265,18 +277,19 @@ static inline void clear_OBJ_Model_Load_Chunk_Data(OBJ_Model_Load_Chunk_Data& da
 
 void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 {
-	void* file = nullptr;
-	b32 opened = file_open(&file, file_name, "rb");
 
-	ASSERT(opened);	//Can't load file.
+	uint32 file_size = get_file_size((char*)file_name);
+	char* buffer_front = (char*)buffer_malloc(file_size + 1);
+	load_file_into(buffer_front, file_size, (char*)file_name);
 
-	uint32 file_size = get_file_size(file);
+	if (buffer_front[file_size - 1] != 0)
+	{
+		buffer_front[file_size] = 0;
+	}
 
 	int32 no_of_chunks = threadpool.threads.size;
 	
-	char* buffer_front = (char*)buffer_malloc(file_size + 1);
 
-	uint8 file_load = load_from_file(file, file_size, buffer_front);
 
 	int32 general_chunk_size = (file_size + (no_of_chunks - 1)) / no_of_chunks;
 	WorkQueue<ParseDataChunk>chunks;
@@ -338,6 +351,4 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	}
 
 
-	b32 closed = file_close(file);
-	ASSERT(closed);	//Can't close file
 }

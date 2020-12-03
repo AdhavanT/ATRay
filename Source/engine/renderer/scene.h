@@ -2,6 +2,7 @@
 #include "sphere.h"
 #include "plane.h"
 #include "model.h"
+#include "aabb.h"
 
 struct Scene
 {

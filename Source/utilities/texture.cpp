@@ -50,7 +50,7 @@ namespace BMP_FILE_FORMAT
 		bmp.bytes_per_pixel = 4;
 		bmp.height = height;
 		bmp.width = width;
-		bmp.buffer_memory = buffer_malloc(bmp.size());
+		bmp.buffer_memory = buffer_calloc(bmp.size());
 	}
 
 	static bool Write_To_File(BitmapBuffer& bmb, const char* file_name)
@@ -80,7 +80,7 @@ namespace BMP_FILE_FORMAT
 		bmp.bfh.reserved2 = 0;
 		bmp.bfh.total_file_size = 14 + sizeof(bmp.bih) + bmp.bitmap_buffer.size();
 
-
+		//TODO: change to use PL file io instead of std library
 		FILE* file;
 
 		uint32 file_id = 0;
@@ -88,15 +88,14 @@ namespace BMP_FILE_FORMAT
 
 		char* new_name = (char*)buffer_malloc(length + 8);
 
-		snprintf(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
+		format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 
 		//Checking if another file exists with same name
 		while (fopen_s(&file, new_name, "r") != ENOENT)
 		{
 			fclose(file);
 			file_id++;
-			snprintf(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
-
+			format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 		}
 		if (file)
 		{
