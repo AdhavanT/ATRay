@@ -9,7 +9,6 @@ struct RenderTile
 {
 	Tile tile;
 	int64 ray_casts;
-	uint64 cycles_to_render;
 };
 
 struct RenderInfo

@@ -1,5 +1,5 @@
 #include "renderer.h"
-
+#include "utilities/ATP/atp.h"
 
 f32 tolerance = 0.0001f;
 
@@ -269,6 +269,7 @@ void prep_scene(Scene scene)
 	}*/
 }
 
+ATP_REGISTER_M(Tiles, 0);
 static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 {
 	RenderTile* rt;
@@ -283,7 +284,8 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 	{
 		rt = &info.twq.jobs[(int32)tile_no - 1];
 	}
-	rt->cycles_to_render = get_tsc();
+	ATP_BLOCK_M(Tiles, tile_no-1);
+
 
 	tile_ = &rt->tile;
 	vec3f pixel_pos;
@@ -335,8 +337,6 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 			Set_Pixel(pixel_color, *info.camera_tex, x, y);
 		}
 	}
-
-	rt->cycles_to_render = get_tsc() - rt->cycles_to_render;
 	return true;
 }
 
@@ -392,6 +392,12 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 			tmp++;
 		}
 	}
+
+	//----for ATP profiling----
+	ATP_GET_TESTTYPE(Tiles)->tests.size = info.twq.jobs.size;
+	ATP_GET_TESTTYPE(Tiles)->tests.finished_tests = 0;
+	ATP_GET_TESTTYPE(Tiles)->tests.front = (ATP::TestInfo*)buffer_calloc(ATP_GET_TESTTYPE(Tiles)->tests.size * sizeof(ATP::TestInfo));
+
 
 	activate_pool(tpool, start_tile_render_thread, &info);
 	

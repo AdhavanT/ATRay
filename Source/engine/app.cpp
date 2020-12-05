@@ -38,7 +38,7 @@ static Model make_model_from_aabb(AABB box)
 ATP_REGISTER(load_assets);
 ATP_REGISTER(prep_scene);
 ATP_REGISTER(render_from_camera);
-void print_out_tests();
+void print_out_tests(PL_Timing& pl);
 void render_app(PL& pl, Texture& texture, ThreadPool& tpool);
 
 void PL_entry_point(PL& pl)
@@ -66,17 +66,17 @@ void PL_entry_point(PL& pl)
 
 }
 
-static RenderTile* find_tile_covering_point(vec2i point, WorkQueue<RenderTile>& twq)
+static int32 find_tile_index_covering_point(vec2i point, WorkQueue<RenderTile>& twq)
 {
-	for (int i = 0; i < twq.jobs.size; i++)
+	for (uint32 i = 0; i < twq.jobs.size; i++)
 	{
 		if (twq.jobs[i].tile.left_bottom.x <= point.x && twq.jobs[i].tile.left_bottom.y <= point.y &&
 			twq.jobs[i].tile.right_top.x >= point.x && twq.jobs[i].tile.right_top.y >= point.y)
 		{
-			return &twq.jobs[i];
+			return (int32)i;
 		}
 	}
-	return 0;
+	return -1;
 }
 
 static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
@@ -101,7 +101,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	rs.anti_aliasing = TRUE;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
-	rs.samples_per_pixel = 1;
+	rs.samples_per_pixel = 5;
 	rs.bounce_limit = 5;
 
 
@@ -157,7 +157,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	tmp.max = { 0.5f,4.5f,-2.5f };
 
 	//scene.models.add_nocpy(monkey_aabb);
-	//scene.models.add_nocpy(monkey);
+	scene.models.add_nocpy(monkey);
 	scene.planes.add(pln[0]);
 	scene.planes.add(pln[1]);
 	scene.spheres.add(spr[0]);
@@ -199,12 +199,14 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 
 	debug_print("\nCompleted:\n");
 	
-	print_out_tests();
+	print_out_tests(pl.time);
 	
 	debug_print("	Total Rays Shot: %I64i rays\n", info.total_ray_casts);
 	debug_print("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)info.total_ray_casts);
 
-	RenderTile* tile_on_mouse = 0;
+	int32 tile_on_mouse = -1;
+	ATP::TestType* Tiles_TestType = 0;
+	Tiles_TestType = ATP::lookup_testtype("Tiles");
 	while (pl.running)
 	{
 
@@ -227,29 +229,17 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 		{
 			vec2i point = { pl.input.mouse.position_x, pl.input.mouse.position_y };
 			
-			if (tile_on_mouse == 0)
+			tile_on_mouse = find_tile_index_covering_point(point, info.twq);
+			if (tile_on_mouse != -1)
 			{
-				RenderTile* tile_on_mouse = find_tile_covering_point(point, info.twq);
-				if (tile_on_mouse != 0)
-				{
-					f64 tile_ms = ((f64)tile_on_mouse->cycles_to_render / (f64)pl.time.cycles_per_second) * 1000;
-					char buffer[512];
-					format_print(buffer, 512, "Rendered: milliseconds to render tile:%.*f ms | rays cast on tile:%i64  ", 3,tile_ms,tile_on_mouse->ray_casts);
-					pl.window.title = buffer;
-					PL_push_window(pl.window, TRUE);
-				}
-			}
-			//checking if mouse is still in the same tile as previous update (an optimization)
-			/*else if ((tile_on_mouse->tile.left_bottom.x >= point.x && tile_on_mouse->tile.left_bottom.y >= point.y &&
-				tile_on_mouse->tile.right_top.x <= point.x && tile_on_mouse->tile.right_top.y <= point.y))
-			{
-				RenderTile* tile_on_mouse = find_tile_covering_point(point, info.twq);
-				f64 tile_ms = (((f64)tile_on_mouse->cycles_to_render * 1000)/ (f64)pl.time.cycles_per_second);
+				uint64 cycles_to_render_tile = Tiles_TestType->tests.front[tile_on_mouse].test_run_cycles;
+				uint64 ray_casts_on_tile = info.twq.jobs[tile_on_mouse].ray_casts;
+				f64 tile_ms = ((f64)cycles_to_render_tile / (f64)pl.time.cycles_per_second) * 1000;
 				char buffer[512];
-				format_print(buffer, 512, "Rendered: rays cast on tile:%i64 | milliseconds to render tile:%f ms", tile_on_mouse->ray_casts,  tile_ms);
+				format_print(buffer, 512, "Rendered:Tile(%i/%i) milliseconds to render tile:%.*f ms | rays cast on tile:%i64  ",tile_on_mouse+1,info.twq.jobs.size, 3,tile_ms, ray_casts_on_tile);
 				pl.window.title = buffer;
 				PL_push_window(pl.window, TRUE);
-			}*/
+			}
 			
 		}
 		else
@@ -283,14 +273,33 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 }
 
 
-static void print_out_tests()
+static void print_out_tests(PL_Timing& pl)
 {
-	int32 length;
-	ATP::TestType* front = ATP::get_testtype_registry(length);
+	int32 length = ATP::testtype_registry->no_of_testtypes;
+	ATP::TestType* front = ATP::testtype_registry->front;
 	for (int i = 0; i < length; i++)
 	{
-		f64 ms = ATP::get_ms_from_test(*front);
-		debug_print("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n",front->name,3, ms, 4,ms/1000);
+		if (front->type == ATP::TestTypeFormat::MULTI)
+		{
+			debug_print("	MULTI TEST (ATP->%s):\n", front->name);
+			ATP::TestInfo* index = front->tests.front;
+			uint64 total = 0;
+			for (uint32 i = 0; i < front->tests.size; i++)
+			{
+				total += index->test_run_cycles;
+				f64 ms = (index->test_run_cycles * 1000 / (f64)pl.cycles_per_second);
+				debug_print("		index:%i:%.*f ms (%.*f s),%I64u\n", i, 3, ms, 4, ms / 1000, index->test_run_cycles);
+				index++;
+			}
+			f64 ms = (total * 1000 / (f64)pl.cycles_per_second);
+			debug_print("	total:%.*f ms (%.*f s), %I64u\n", 3, ms, 4, ms / 1000, total);
+
+		}
+		else
+		{
+			f64 ms = ATP::get_ms_from_test(*front);
+			debug_print("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n", front->name, 3, ms, 4, ms / 1000);
+		}
 		front++;
 	}
 }
