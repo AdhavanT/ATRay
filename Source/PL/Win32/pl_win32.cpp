@@ -214,6 +214,11 @@ LRESULT static CALLBACK wnd_proc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 			PostQuitMessage(0);
 		}break;
 
+		case WM_QUIT:
+		{
+			*pl_specific->pointer_to_pl_running = FALSE;
+		}
+
 		case WM_TIMER:
 		{
 			SwitchToFiber((pl_specific)->main_fiber);

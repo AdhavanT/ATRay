@@ -1,3 +1,4 @@
+#include "PL/pl.h"
 #include "renderer/renderer.h"
 #include "utilities/texture.h"
 #include "utilities/ATP/atp.h"
@@ -63,12 +64,16 @@ void PL_entry_point(PL& pl)
 	PL_initialize_timing(pl.time);
 	render_app(pl,texture, thread_pool);
 
-
+	buffer_free(texture.bmb.buffer_memory);
+	
+	//NOTE: by now, none of the threads should be running anything. 
+	close_threads((uint32)thread_pool.threads.size, &thread_pool.threads.front->handle);
+	thread_pool.threads.clear();
 }
 
 static int32 find_tile_index_covering_point(vec2i point, WorkQueue<RenderTile>& twq)
 {
-	for (uint32 i = 0; i < twq.jobs.size; i++)
+	for (uint32 i = 0; i < (uint32)twq.jobs.size; i++)
 	{
 		if (twq.jobs[i].tile.left_bottom.x <= point.x && twq.jobs[i].tile.left_bottom.y <= point.y &&
 			twq.jobs[i].tile.right_top.x >= point.x && twq.jobs[i].tile.right_top.y >= point.y)
@@ -181,6 +186,15 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	while (wait_for_render_from_camera_to_finish(info, tpool, 33))	//checks if threadpool is finished every 33 milliseconds and exists when done.
 	{
 		PL_poll_window(pl.window);
+		if (pl.running != TRUE)
+		{
+			//TODO:Maybe put warning message about how the process wont end until all threads finish the tile they're working on
+			info.twq.clear();
+			wait_for_pool(tpool, UINT32MAX);
+			free_scene_memory(scene);	//NOTE:cleared out on process end anyway. Maybe implement a "shutdown" which waits for all threads to finish then clears scene memory.
+			return;
+
+		}
 		if (info.twq.jobs_done > last_tile)
 		{
 			char buffer[512];
@@ -260,18 +274,9 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	}
 
 
-	monkey.data.faces_data.clear();
-	monkey.data.normals.clear();
-	monkey.data.tex_coords.clear();
-	monkey.data.faces_vertices.clear();
-
-	scene.materials.clear_buffer();
-	scene.models.clear_buffer();
-	scene.spheres.clear_buffer();
-	scene.planes.clear_buffer();
+	free_scene_memory(scene);
 
 }
-
 
 static void print_out_tests(PL_Timing& pl)
 {

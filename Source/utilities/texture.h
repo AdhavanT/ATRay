@@ -1,5 +1,12 @@
 #pragma once
-#include "types.h"
+
+#include "PL/PL_math.h"
+
+#ifdef _DEBUG
+#define ASSERT(x) if(!(x)) __debugbreak();
+#else
+#define ASSERT(X)
+#endif 
 
 enum struct TextureFileType
 {

@@ -17,3 +17,4 @@ struct Scene
 	DBuffer<Plane> planes;
 };
 
+void free_scene_memory(Scene& scene);

@@ -284,7 +284,7 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 	{
 		rt = &info.twq.jobs[(int32)tile_no - 1];
 	}
-	ATP_BLOCK_M(Tiles, tile_no-1);
+	ATP_BLOCK_M(Tiles, (uint32)tile_no-1);
 
 
 	tile_ = &rt->tile;
@@ -392,7 +392,7 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 			tmp++;
 		}
 	}
-
+	
 	//----for ATP profiling----
 	ATP_GET_TESTTYPE(Tiles)->tests.size = info.twq.jobs.size;
 	ATP_GET_TESTTYPE(Tiles)->tests.finished_tests = 0;

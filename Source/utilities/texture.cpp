@@ -1,6 +1,7 @@
 #include "texture.h"
+#include "PL/pl_utils.h"
 #include <cstdio>
-#include <string>
+//#include <string>
 
 namespace BMP_FILE_FORMAT
 {

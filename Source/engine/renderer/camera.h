@@ -1,5 +1,5 @@
 #pragma once
-#include "utilities/types.h"
+#include "PL/PL_math.h"
 #include "settings.h"
 #include "ray.h"
 #include "renderer.h"

@@ -17,36 +17,6 @@ uint64 get_hardware_entropy()
 	return __rdtsc() * GetCurrentThreadId();
 }
 
-int32 interloacked_add_i32(volatile int32* data, int32 value)
-{
-	return InterlockedAdd((volatile long*)data, value);
-}
-
-int64 interlocked_add_i64(volatile int64* data, int64 value)
-{
-	return InterlockedAdd64(data, value);
-}
-
-int64 interlocked_decrement_i32(volatile int32* data)
-{
-	return InterlockedDecrement((volatile long*)data);
-}
-
-int64 interlocked_increment_i32(volatile int32* data)
-{
-	return InterlockedIncrement((volatile long*)data);
-}
-
-int64 interlocked_decrement_i64(volatile int64* data)
-{
-	return InterlockedDecrement64(data);
-}
-
-int64 interlocked_increment_i64(volatile int64* data)
-{
-	return InterlockedIncrement64(data);
-}
-
 void close_thread(const ThreadHandle* handle)
 {
 	CloseHandle(handle->thread_handle);
@@ -56,7 +26,9 @@ void close_threads(uint32 no_of_threads, const ThreadHandle* handles)
 {
 	for (uint32 i = 0; i < no_of_threads; i++)
 	{
-		CloseHandle(handles[i].thread_handle);
+		
+		b32 success = CloseHandle(handles[i].thread_handle);
+		ASSERT(success);
 	}
 }
 
@@ -134,7 +106,6 @@ void sleep_thread(uint32 timeout_in_ms)
 	Sleep((DWORD)timeout_in_ms);
 }
 
-
 void load_file_into(void* block_to_store_into, uint32 bytes_to_load,char* path)
 {
 	void* file;
@@ -149,6 +120,12 @@ void load_file_into(void* block_to_store_into, uint32 bytes_to_load,char* path)
 	{
 		ASSERT(FALSE);	//cant close file!
 	}
+}
+
+b32 create_and_load_into_file(void* block_to_store, uint32 bytes_to_write, char* path)
+{
+
+	return b32();
 }
 
 uint32 get_file_size(char* path)
