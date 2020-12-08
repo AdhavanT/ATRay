@@ -26,7 +26,9 @@ void close_threads(uint32 no_of_threads, const ThreadHandle* handles)
 {
 	for (uint32 i = 0; i < no_of_threads; i++)
 	{
-		CloseHandle(handles[i].thread_handle);
+		
+		b32 success = CloseHandle(handles[i].thread_handle);
+		ASSERT(success);
 	}
 }
 
@@ -103,7 +105,6 @@ void sleep_thread(uint32 timeout_in_ms)
 {
 	Sleep((DWORD)timeout_in_ms);
 }
-
 
 void load_file_into(void* block_to_store_into, uint32 bytes_to_load,char* path)
 {

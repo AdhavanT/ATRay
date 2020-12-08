@@ -323,7 +323,7 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	*chunks.jobs[chunks.jobs.size - 1].end = '\n';	//to make the last character a new line.
 
 	activate_pool(threadpool, start_parse_chunk_thread, &chunks);
-	wait_for_pool(threadpool);
+	wait_for_pool(threadpool, UINT32MAX);
 
 	
 	//joining the chunks together

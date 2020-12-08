@@ -642,7 +642,7 @@ FORCEDINLINE int64 interlocked_add_i64(volatile int64* data, int64 value)
 	return InterlockedAdd64(data, value);
 }
 //performs atomic add and returns result(for int32 value)
-FORCEDINLINE int32 interloacked_add_i32(volatile int32* data, int32 value)
+FORCEDINLINE int32 interlocked_add_i32(volatile int32* data, int32 value)
 {
 	return InterlockedAdd((volatile long*)data, value);
 }
@@ -667,6 +667,16 @@ FORCEDINLINE int64 interlocked_decrement_i64(volatile int64* data)
 FORCEDINLINE int64 interlocked_decrement_i32(volatile int32* data)
 {
 	return InterlockedDecrement((volatile long*)data);
+}
+//returns previous value after exchanging with new value
+FORCEDINLINE int64 interlocked_exchange_i64(volatile int64* data, int64 value)
+{
+	return InterlockedExchange64((volatile long long*)data, value);
+}
+//returns previous value after exchanging with new value
+FORCEDINLINE int32 interlocked_exchange_i32(volatile int32* data, int32 value)
+{
+	return InterlockedExchange((volatile long*)data, value);
 }
 
 //---------------------------</ATOMICS>--------------------------------------
