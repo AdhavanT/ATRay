@@ -1,3 +1,6 @@
 [submodule "ATP"]
 	path = Source/utilities/ATP
 	url = https://github.com/AdhavanT/ATProfiler.git
+[submodule "PL"]
+	path = Source/Platform-Layer
+	url = https://github.com/AdhavanT/Platform-Layer.git
