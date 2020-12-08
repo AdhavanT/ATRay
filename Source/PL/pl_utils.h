@@ -1,6 +1,7 @@
 #pragma once
 
-#include "pl.h"
+#include "PL_base_defs.h"
+
 //-------------------------------------------<MEMORY ALLOCATION>-------------------------------------------
 void buffer_set(void* buffer, int32 value_to_set, int32 no_bytes_to_set);
 void buffer_copy(void* destination, void* from, uint32 length);
@@ -41,22 +42,6 @@ void sleep_thread(uint32 timeout_in_ms);
 //gets unique thread id
 uint32 get_thread_id();
 
-//performs atomic add and returns result(for int64 value)
-int64 interlocked_add_i64(volatile int64*, int64);
-//performs atomic add and returns result(for int32 value)
-int32 interloacked_add_i32(volatile int32* data, int32 value);
-
-
-//returns resulting incremented value after performing locked increment(for int64 value)
-int64 interlocked_increment_i64(volatile int64*);
-//returns resulting decremented value after performing locked decrement(for int32 value)
-int64 interlocked_increment_i32(volatile int32* data);
-
-
-//returns resulting decremented value after performing locked decrement(for int64 value)
-int64 interlocked_decrement_i64(volatile int64* data);
-//returns resulting decremented value after performing locked decrement(for int32 value)
-int64 interlocked_decrement_i32(volatile int32* data);
 
 //------------------------------------------</THREADING>--------------------------------------------
 
@@ -71,6 +56,9 @@ uint64 get_hardware_entropy();
 
 //Will load contents of file from beginning of file to block_to_store_into
 void load_file_into(void* block_to_store_into, uint32 bytes_to_load, char* path);
+
+//returns true if successfully created and written. false if file already exists.
+b32 create_and_load_into_file(void* block_to_store, uint32 bytes_to_write, char* path);
 
 //returns file size in bytes
 uint32 get_file_size(char* path);

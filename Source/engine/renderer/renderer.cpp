@@ -392,7 +392,7 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 			tmp++;
 		}
 	}
-
+	
 	//----for ATP profiling----
 	ATP_GET_TESTTYPE(Tiles)->tests.size = info.twq.jobs.size;
 	ATP_GET_TESTTYPE(Tiles)->tests.finished_tests = 0;

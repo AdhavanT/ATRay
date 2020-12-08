@@ -9,6 +9,7 @@ struct AABB
         vec3f bounds[2];
         struct
         {
+            //NOTE:dont change order. ray_aabb_intersection uses bounds as optimization.
             vec3f min;
             vec3f max;
         };
