@@ -1,5 +1,5 @@
-#include "pl.h"
-#include "pl_config.h"
+#include "PL/pl.h"
+#include "PL/pl_config.h"
 #include <windows.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>

@@ -1,4 +1,4 @@
-#include "pl_utils.h"
+#include "PL/pl_utils.h"
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <corecrt_malloc.h>
@@ -122,10 +122,34 @@ void load_file_into(void* block_to_store_into, uint32 bytes_to_load,char* path)
 	}
 }
 
-b32 create_and_load_into_file(void* block_to_store, uint32 bytes_to_write, char* path)
+b32 create_file(void** file_handle,char* path)
 {
+	*file_handle = CreateFileA(path, GENERIC_WRITE, 0, 0, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, 0);
+	if (INVALID_HANDLE_VALUE == file_handle)
+	{
+		return FALSE;
+	}
+	else if (GetLastError() == ERROR_FILE_EXISTS)
+	{
+		return FALSE;
+	}
+	else
+	{
+		return TRUE;
+	}
+}
 
-	return b32();
+b32 append_to_file(void* file_handle, void* block_to_store, int32 bytes_to_append)
+{
+	LARGE_INTEGER offset;
+	offset.QuadPart = 0;
+	SetFilePointerEx(file_handle, offset, 0, FILE_END);
+	return WriteFile(file_handle, block_to_store, bytes_to_append, 0, 0);
+}
+
+b32 close_file_handle(void* file_handle)
+{
+	return CloseHandle(file_handle);
 }
 
 uint32 get_file_size(char* path)

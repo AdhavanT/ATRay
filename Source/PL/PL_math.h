@@ -10,6 +10,43 @@
 
 //-----------------------------------------------
 
+//Table for quick uint64 pow(10,x)
+constexpr uint64 INT_POWER_10[20] =
+{
+	1,
+	10,
+	100,
+	1000,
+	10000,
+	100000,
+	1000000,
+	10000000,
+	100000000,
+	1000000000,
+	10000000000,
+	100000000000,
+	1000000000000,
+	10000000000000,
+	100000000000000,
+	1000000000000000,
+	10000000000000000,
+	100000000000000000,
+	1000000000000000000,
+	10000000000000000000,
+};
+
+#define AT_POWER_10_OFFSET 28	//where 1.0 (1.0e0) is in POWER_10
+#define POWER_10(x) F64_POWER_10[AT_POWER_10_OFFSET + (x)]
+//Table for quick f64 pow(10,x)
+constexpr
+f64 F64_POWER_10[48] =
+{ 1.0e-28,  1.0e-27,  1.0e-26,  1.0e-25,  1.0e-24,  1.0e-23,  1.0e-22,  1.0e-21,  1.0e-20,
+	1.0e-19,  1.0e-18,  1.0e-17,  1.0e-16,  1.0e-15,  1.0e-14,  1.0e-13,  1.0e-12,  1.0e-11,
+	1.0e-10,  1.0e-9,   1.0e-8,   1.0e-7,   1.0e-6,   1.0e-5,   1.0e-4,   1.0e-3,   1.0e-2,
+	1.0e-1,
+	1.0e0,  1.0e1,  1.0e2,  1.0e3,  1.0e4,  1.0e5,  1.0e6,  1.0e7,  1.0e8,  1.0e9,
+	1.0e10, 1.0e11, 1.0e12, 1.0e13, 1.0e14, 1.0e15, 1.0e16, 1.0e17, 1.0e18, 1.0e19,
+};
 
 // Operations
 
@@ -91,7 +128,7 @@ struct DBuffer
 template<typename t, typename size_type = int32>
 struct FDBuffer
 {
-	size_type size;
+	size_type size = 0;
 	t* front = 0;
 
 	//Allocates memory (initilizes to default memory of the type) and returns pointer to allocation

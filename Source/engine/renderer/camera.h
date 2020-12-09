@@ -13,11 +13,11 @@ struct Camera
 	f32 aspect_ratio;
 	vec3f camera_z, camera_x, camera_y;
 
-	vec3f eye; //position of virtual eye
+	vec3f eye = { 0 }; //position of virtual eye
 	vec3f frame_center; //center of camera "sensor"
 
-	f32 h_fov;
-	f32 half_pixel_width, half_pixel_height;
+	f32 h_fov = 1;
+	f32 half_pixel_width = 0, half_pixel_height = 0;
 };
 
 static inline void update_camera_pos(Camera& cm, vec3f eye, vec3f facing_towards)

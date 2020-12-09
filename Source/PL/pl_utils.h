@@ -57,8 +57,13 @@ uint64 get_hardware_entropy();
 //Will load contents of file from beginning of file to block_to_store_into
 void load_file_into(void* block_to_store_into, uint32 bytes_to_load, char* path);
 
-//returns true if successfully created and written. false if file already exists.
-b32 create_and_load_into_file(void* block_to_store, uint32 bytes_to_write, char* path);
+//returns true if successfully created and loads file_handle. false if file already exists.
+b32 create_file(void** file_handle, char* path);
+
+//appends to file. returns true if successful.
+b32 append_to_file(void* file_handle, void* block_to_store, int32 bytes_to_append);
+
+b32 close_file_handle(void* file_handle);
 
 //returns file size in bytes
 uint32 get_file_size(char* path);

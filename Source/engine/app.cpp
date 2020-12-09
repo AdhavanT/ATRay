@@ -47,7 +47,7 @@ void PL_entry_point(PL& pl)
 	pl.running = TRUE;
 	pl.core_count = 8;
 	Texture texture;
-	Setup_Texture(texture, TextureFileType::BMP, 1270, 720);
+	Setup_Texture(texture, TextureFileType::BMP, 1280, 720);
 
 	pl.window.height = texture.bmb.height;
 	pl.window.width = texture.bmb.width;
@@ -228,7 +228,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 		PL_poll_input_keyboard(pl.input.kb);
 		PL_poll_input_mouse(pl.input.mouse, pl.window);
 		
-		if (pl.input.keys[PL_KEY::SHIFT].down && pl.input.keys[PL_KEY::S].down)
+		if (pl.input.keys[PL_KEY::SHIFT].down && pl.input.keys[PL_KEY::S].pressed)
 		{
 			Write_To_File(texture, "Results\\resultings");
 			pl.window.title = (char*)"SAVED TO FILE!";

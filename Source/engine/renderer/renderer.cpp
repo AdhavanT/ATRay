@@ -25,11 +25,11 @@ enum class ObjectType
 
 struct IntersectionData
 {
-	ObjectType type;
-	f32 distance_at_intersection;
-	vec3f normal;
-	Material* hit_material;
-	TriangleIntersectionData tid;
+	ObjectType type = {};
+	f32 distance_at_intersection = 0;
+	vec3f normal = {0};
+	Material* hit_material = 0;
+	TriangleIntersectionData tid = { 0 };
 };
 
 void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& intersection_data)
@@ -411,8 +411,6 @@ b32 wait_for_render_from_camera_to_finish(RenderInfo& info,ThreadPool& tpool, ui
 	}
 	else
 	{
-		close_threads(tpool.threads.size, &tpool.threads[0].handle);
-
 		for (int i = 0; i < info.twq.jobs.size; i++)
 		{
 			info.total_ray_casts += info.twq.jobs[i].ray_casts;

@@ -1,7 +1,16 @@
 #include "texture.h"
 #include "PL/pl_utils.h"
-#include <cstdio>
-//#include <string>
+
+static uint32 strlen(char* str) 
+{
+	uint32 len = 0;
+	while (*str != 0) 
+	{
+		str++;
+		len++;
+	}
+	return len;
+}
 
 namespace BMP_FILE_FORMAT
 {
@@ -82,37 +91,28 @@ namespace BMP_FILE_FORMAT
 		bmp.bfh.total_file_size = 14 + sizeof(bmp.bih) + bmp.bitmap_buffer.size();
 
 		//TODO: change to use PL file io instead of std library
-		FILE* file;
+		void* file = 0;
 
 		uint32 file_id = 0;
-		int length = strlen(file_name);
+		int length = strlen((char*)file_name);
 
 		char* new_name = (char*)buffer_malloc(length + 8);
 
 		format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 
 		//Checking if another file exists with same name
-		while (fopen_s(&file, new_name, "r") != ENOENT)
+		while (!create_file(&file, new_name))
 		{
-			fclose(file);
 			file_id++;
 			format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 		}
 		if (file)
 		{
-			fclose(file);
+			append_to_file(file, &bmp.bfh, 14);
+			append_to_file(file,&bmp.bih, sizeof(bmp.bih));
+			append_to_file(file, bmp.bitmap_buffer.buffer_memory, bmp.bitmap_buffer.size());
+			close_file_handle(file);
 		}
-
-		if (fopen_s(&file, new_name, "wb"))
-		{
-			buffer_free(new_name);
-			return false;
-		}
-
-		fwrite(&bmp.bfh, 1, 14, file);
-		fwrite(&bmp.bih, sizeof(bmp.bih), 1, file);
-		fwrite(bmp.bitmap_buffer.buffer_memory, bmp.bitmap_buffer.size(), 1, file);
-		fclose(file);
 		buffer_free(new_name);
 		return true;
 	}
