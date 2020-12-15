@@ -17,7 +17,7 @@ struct AABB
 };
 
 
-static inline b32 is_inside(vec3f& point, AABB& box)
+static inline b32 is_inside(vec3f point, AABB box)
 {
 	//TODO: Make this SIMD
 	b32 x_check = (point.x >= box.min.x) & (point.x <= box.max.x);

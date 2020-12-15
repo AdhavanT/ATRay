@@ -72,19 +72,19 @@ static inline f32 get_triangle_ray_intersection_culled(Ray& ray, TriangleVertice
 }
 
 //Gets the scale per axis of the model
-inline AABB get_AABB(Model& mdl)
+inline AABB get_AABB(ModelData& data)
 {
 	f32 x_max = -MAX_FLOAT, x_min = MAX_FLOAT, y_max = -MAX_FLOAT, y_min = MAX_FLOAT, z_max = -MAX_FLOAT, z_min = MAX_FLOAT;
-	for (uint32 i = 0; i < mdl.data.vertices.size; i++)
+	for (uint32 i = 0; i < data.vertices.size; i++)
 	{
-		x_max = max(x_max, mdl.data.vertices[i].x);
-		x_min = min(x_min, mdl.data.vertices[i].x);
+		x_max = max(x_max, data.vertices[i].x);
+		x_min = min(x_min, data.vertices[i].x);
 
-		y_max = max(y_max, mdl.data.vertices[i].y);
-		y_min = min(y_min, mdl.data.vertices[i].y);
+		y_max = max(y_max, data.vertices[i].y);
+		y_min = min(y_min, data.vertices[i].y);
 
-		z_max = max(z_max, mdl.data.vertices[i].z);
-		z_min = min(z_min, mdl.data.vertices[i].z);
+		z_max = max(z_max, data.vertices[i].z);
+		z_min = min(z_min, data.vertices[i].z);
 	}
 	AABB ret = {};
 	ret.max = { x_max,y_max,z_max };
