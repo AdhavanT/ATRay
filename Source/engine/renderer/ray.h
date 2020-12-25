@@ -11,6 +11,13 @@ struct Ray
 	}
 };
 
+struct Optimized_Ray
+{
+	Ray ray;
+	vec3f inv_ray_d;
+	vec3i inv_signs;
+};
+
 static inline void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
 {
 	ray.origin = origin_;

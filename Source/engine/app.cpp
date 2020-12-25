@@ -84,33 +84,42 @@ static int32 find_tile_index_covering_point(vec2i point, WorkQueue<RenderTile>& 
 	return -1;
 }
 
+ATP_REGISTER(build_KD_tree);
+
 static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 {
 
 	ATP_START(load_assets);
 
 	debug_print("\nLoading Assets...\n");
-	
 	Model monkey = {};
 	load_model_data(monkey.data, "Assets\\Monkey.obj", tpool);
-	monkey.surrounding_aabb = get_AABB(monkey);
-	resize_scale(monkey, 2);
-	translate_to(monkey, { 1.f,2.f,-3.f });
+	monkey.surrounding_aabb = get_AABB(monkey.data);
+	resize_scale(monkey, 4);
+	translate_to(monkey, { 3.f,2.f,-5.f });
 
 	//Model monkey_aabb = make_model_from_aabb(monkey_scale);
 	ATP_END(load_assets);
 
+	ATP_START(build_KD_tree);
+	monkey.kd_tree.max_divisions = KD_Divisions::TWO;
+	monkey.kd_tree.division_method = KD_Division_Method::CENTER;
+	monkey.kd_tree.max_no_faces_per_node = 800;
+	build_KD_tree(monkey.data, monkey.kd_tree);
+	ATP_END(build_KD_tree);
+	//monkey.data.faces_vertices.clear();
+
 	Camera cm;
 	RenderSettings rs;
 	rs.no_of_threads = tpool.threads.size;
-	rs.anti_aliasing = TRUE;
+	rs.anti_aliasing = FALSE;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;
 	rs.samples_per_pixel = 5;
 	rs.bounce_limit = 5;
 
 
-	set_camera(cm, { 0.f,4.f,0.f }, { 0.f, -1.f,-1.f }, rs, 1.0f);
+	set_camera(cm, { 0.f,2.f,0.f }, { 0.f, -0.5f,-1.f }, rs, 1.0f);
 
 	Scene scene;
 	Material skybox = { {0.3f,0.4f,0.5f}, {0.2f,0.3f,0.4f},0.3f };
@@ -161,6 +170,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	tmp.min = { -0.5f,-0.5f,-3.5f };
 	tmp.max = { 0.5f,4.5f,-2.5f };
 
+	
 	//scene.models.add_nocpy(monkey_aabb);
 	scene.models.add_nocpy(monkey);
 	scene.planes.add(pln[0]);
@@ -255,6 +265,13 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 				PL_push_window(pl.window, TRUE);
 			}
 			
+		}
+		else if (pl.input.mouse.right.down && pl.input.mouse.is_in_window)
+		{
+			char buffer[512];
+			format_print(buffer, 512, "Pixel: [%i, %i] ", pl.input.mouse.position_x, pl.input.mouse.position_y);
+			pl.window.title = buffer;
+			PL_push_window(pl.window, TRUE);
 		}
 		else
 		{

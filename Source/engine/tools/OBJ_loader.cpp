@@ -299,7 +299,7 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	char* file_end = (buffer_front + (file_size - 1));
 	while (ptr < file_end)
 	{
-		uint32 cursor = 0;
+		uint64 cursor = 0;
 		chunk->start = ptr;
 		cursor += general_chunk_size;
 		if ((ptr + cursor) > file_end)
@@ -314,7 +314,7 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 			}
 		}
 		ptr += cursor;
-		chunk->chunk_size = cursor;
+		chunk->chunk_size = (int32)cursor;
 		chunk->end = ptr;
 		chunk++;
 		ptr++;

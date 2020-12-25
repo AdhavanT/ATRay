@@ -11,16 +11,9 @@ static inline vec3f get_reflection(vec3f incident, vec3f normal)
 }
 
 
-struct TriangleIntersectionData
-{
-	Model* model;
-	uint32 face_index;
-	f32 u, v;
-};
-
 enum class ObjectType
 {
-	AABB,TRIANGLE, SPHERE, PLANE, SKYBOX
+	NONE,TRIANGLE, SPHERE, PLANE, SKYBOX
 };
 
 struct IntersectionData
@@ -29,21 +22,39 @@ struct IntersectionData
 	f32 distance_at_intersection = 0;
 	vec3f normal = {0};
 	Material* hit_material = 0;
+
 	TriangleIntersectionData tid = { 0 };
 };
 
+#define USE_KD_TREE
+
+
 void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& intersection_data)
 {
-	f32 closest = MAX_FLOAT;
+	intersection_data.distance_at_intersection = MAX_FLOAT;
 	Sphere* nearest_sphere = nullptr;
 	Plane* nearest_plane = nullptr;
-	intersection_data.tid.model = nullptr;
+	Model* nearest_model = nullptr;
 
-	vec3f inv_dir = {1 / casted_ray.direction.x,1/casted_ray.direction.y, 1/casted_ray.direction.z};
-	vec3i sign = { inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0 };
+	Optimized_Ray op_ray;
+	op_ray.ray = casted_ray;
+	op_ray.inv_ray_d = { 1 / casted_ray.direction.x,1 / casted_ray.direction.y, 1 / casted_ray.direction.z };
+	op_ray.inv_signs = { op_ray.inv_ray_d.x < 0, op_ray.inv_ray_d.y < 0, op_ray.inv_ray_d.z < 0 };
+
+
 	for (int32 i = 0; i < scene.models.length; i++)
 	{
-		if (get_ray_AABB_intersection(casted_ray, scene.models[i].surrounding_aabb, inv_dir, sign))
+#if defined(USE_KD_TREE)
+		TriangleIntersectionData td;
+		f32 t = get_ray_kd_tree_intersection(op_ray, scene.models[i].kd_tree, td);
+		if (t > tolerance && t < intersection_data.distance_at_intersection)
+		{
+			intersection_data.distance_at_intersection = t;
+			intersection_data.tid = td;
+			nearest_model = &scene.models[i];
+		}
+#else
+		if (get_ray_AABB_intersection(op_ray, scene.models[i].surrounding_aabb))
 		{
 			uint32 face_data_index = -1;	//assumes number of faces for model is less than 4,294,967,295 (MAX of UINT32)
 			for (uint32 j = 0; j < scene.models[i].data.faces_vertices.size; j++)
@@ -56,9 +67,9 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 				f32 u, v;
 				//TODO: check if passing by value or manually inlining is faster for checking intersection
 				f32 t = get_triangle_ray_intersection_culled(casted_ray, tri, u, v);
-				if (t > tolerance && t < closest)
+				if (t > tolerance && t < intersection_data.distance_at_intersection)
 				{
-					closest = t;
+					intersection_data.distance_at_intersection = t;
 					intersection_data.tid.u = u;
 					intersection_data.tid.v = v;
 					face_data_index = j;
@@ -67,9 +78,11 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 			if (face_data_index != -1)	//closest intersection was found for this model
 			{
 				intersection_data.tid.face_index = face_data_index;
-				intersection_data.tid.model = &scene.models[i];
+				nearest_model = &scene.models[i];
 			}
-		}
+		}		
+#endif
+
 	}
 
 	for (int i = 0; i < scene.spheres.length; i++)
@@ -77,9 +90,9 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		Sphere* spr = &scene.spheres[i];
 
 		f32 t = get_sphere_ray_intersection(casted_ray, *spr);
-		if (t > tolerance && t < closest)
+		if (t > tolerance && t < intersection_data.distance_at_intersection)
 		{
-			closest = t;
+			intersection_data.distance_at_intersection = t;
 			nearest_sphere = spr;
 		}
 	}
@@ -88,10 +101,10 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		Plane* pln = &scene.planes[i];
 
 		f32 t = get_plane_ray_intersection(casted_ray, *pln);
-		if (t > tolerance && t < closest)
+		if (t > tolerance && t < intersection_data.distance_at_intersection)
 		{
 			nearest_plane = pln;
-			closest = t;
+			intersection_data.distance_at_intersection = t;
 		}
 	}
 
@@ -106,21 +119,21 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 	else if (nearest_sphere != nullptr)	//nearest hit is a sphere
 	{
 		intersection_data.type = ObjectType::SPHERE;
-		intersection_data.normal = casted_ray.at(closest) - nearest_sphere->center;
+		intersection_data.normal = casted_ray.at(intersection_data.distance_at_intersection) - nearest_sphere->center;
 		intersection_data.hit_material = nearest_sphere->material;
 	}
 	//just some code to test if intersection works
-	else if (intersection_data.tid.model != nullptr)	//nearest hit is a triangle
+	else if (nearest_model != nullptr)	//nearest hit is a triangle
 	{
 		intersection_data.type = ObjectType::TRIANGLE;
 		//Smooth Shading
 		vec3f normal_a, normal_b, normal_c;
-		if (intersection_data.tid.model->data.normals.size > 0)
+		if (nearest_model->data.normals.size > 0)
 		{
-			FaceData* face_data = &intersection_data.tid.model->data.faces_data[intersection_data.tid.face_index];
-			normal_a = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[0]];
-			normal_b = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[1]];;
-			normal_c = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[2]];;
+			FaceData* face_data = &nearest_model->data.faces_data[intersection_data.tid.face_index];
+			normal_a = nearest_model->data.normals[face_data->vertex_normals_indices[0]];
+			normal_b = nearest_model->data.normals[face_data->vertex_normals_indices[1]];;
+			normal_c = nearest_model->data.normals[face_data->vertex_normals_indices[2]];;
 
 			//Interpolating normals
 			intersection_data.normal = normal_a * (1 - intersection_data.tid.u - intersection_data.tid.v) + normal_b * intersection_data.tid.u + normal_c * intersection_data.tid.v;
@@ -128,21 +141,21 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		//regular shading
 		else
 		{
-			FaceVertices* face_v = &intersection_data.tid.model->data.faces_vertices[intersection_data.tid.face_index];
-			vec3f ab = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[1]];
-			vec3f ac = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[2]];
+			FaceVertices* face_v = &nearest_model->data.faces_vertices[intersection_data.tid.face_index];
+			vec3f ab = nearest_model->data.vertices[face_v->vertex_indices[0]] - nearest_model->data.vertices[face_v->vertex_indices[1]];
+			vec3f ac = nearest_model->data.vertices[face_v->vertex_indices[0]] - nearest_model->data.vertices[face_v->vertex_indices[2]];
 			intersection_data.normal = cross(ab, ac);
 		}
 		//TODO: set the material for 
-		intersection_data.hit_material = intersection_data.tid.model->data.material;
+		intersection_data.hit_material = nearest_model->data.material;
 	}
 	else
 	{
 		//Hits nothing but Skybox
+		//TODO: proper skybox intersection. Maybe cube map
 		intersection_data.hit_material = &scene.materials[0];	//material 0 is skybox
 		intersection_data.type = ObjectType::SKYBOX;
 	}
-	intersection_data.distance_at_intersection = closest;
 	normalize(intersection_data.normal);
 
 	return;
@@ -298,6 +311,14 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 
 		for (int32 x = tile_->left_bottom.x; x <= tile_->right_top.x; x++)
 		{
+			/*if (x == 645 && y == 452)
+			{
+				__debugbreak();
+			}
+			else
+			{
+				continue;
+			}*/
 			f32 film_x = (-1.0f + 2.0f * ((f32)x / (f32)info.camera->render_settings.resolution.x)) * info.camera->h_fov * info.camera->aspect_ratio;
 
 			vec3b pixel_color;

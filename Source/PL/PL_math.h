@@ -68,7 +68,7 @@ struct DBuffer
 	size_type overflow_addon = overflow__;
 	t* front = 0;
 
-	inline void add(t new_member)
+	inline t* add(t new_member)
 	{
 		length++;
 		if (front == 0)		//Buffer was not initilized and is being initialized here. 
@@ -86,10 +86,11 @@ struct DBuffer
 		t* temp = front;
 		temp = temp + (length - 1);
 		*temp = new_member;
+		return temp;
 	}
 
 	//Same as add but doesn't perform copy. (Use for BIG objects)
-	inline void add_nocpy(t& new_member)
+	inline t* add_nocpy(t& new_member)
 	{
 		length++;
 		if (front == 0)		//Buffer was not initilized and is being initialized here. 
@@ -107,6 +108,7 @@ struct DBuffer
 		t* temp = front;
 		temp = temp + (length - 1);
 		*temp = new_member;
+		return temp;
 	}
 
 	//Clears memory and resets length.

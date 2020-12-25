@@ -28,76 +28,74 @@ static inline b32 is_inside(vec3f point, AABB box)
 }
 
 
-//
-static inline b32 get_ray_AABB_intersection(Ray& r, AABB& bb, vec3f inv_ray_d, vec3i inv_signs)
+static inline b32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
 {
-	if (is_inside(r.origin, bb))
+	if (is_inside(r.ray.origin, bb))
 	{
 		return true;
 	}
-    
-    //optimized version 
-    float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
-    tmin = (bb.bounds[inv_signs[0]].x - r.origin.x) * inv_ray_d.x;
-    tmax = (bb.bounds[1 - inv_signs[0]].x - r.origin.x) * inv_ray_d.x;
-    tymin = (bb.bounds[inv_signs[1]].y - r.origin.y) * inv_ray_d.y;
-    tymax = (bb.bounds[1 - inv_signs[1]].y - r.origin.y) * inv_ray_d.y;
+	//optimized version 
+	float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
-    if ((tmin > tymax) || (tymin > tmax))
-        return false;
-    if (tymin > tmin)
-        tmin = tymin;
-    if (tymax < tmax)
-        tmax = tymax;
+	tmin = (bb.bounds[r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tmax = (bb.bounds[1 - r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tymin = (bb.bounds[r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
+	tymax = (bb.bounds[1 - r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
 
-    tzmin = (bb.bounds[inv_signs[2]].z - r.origin.z) * inv_ray_d.z;
-    tzmax = (bb.bounds[1 - inv_signs[2]].z - r.origin.z) * inv_ray_d.z;
+	if ((tmin > tymax) || (tymin > tmax))
+		return false;
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
 
-    if ((tmin > tzmax) || (tzmin > tmax))
-        return false;
-    if (tzmin > tmin)
-        tmin = tzmin;
-    if (tzmax < tmax)
-        tmax = tzmax;
+	tzmin = (bb.bounds[r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
+	tzmax = (bb.bounds[1 - r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
 
-    return true;
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return false;
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;
 
-    //better to understand what is going on
-    /*float tmin = (bb.min.x - r.origin.x) * inv_ray_d.x;
-    float tmax = (bb.max.x - r.origin.x) * inv_ray_d.x;
+	return true;
 
-    if (inv_ray_d.x < 0) swap(tmin, tmax);
+	//better to understand what is going on
+	/*float tmin = (bb.min.x - r.ray.origin.x) * r.inv_ray_d.x;
+	float tmax = (bb.max.x - r.ray.origin.x) * r.inv_ray_d.x;
 
-    float tymin = (bb.min.y - r.origin.y) * inv_ray_d.y;
-    float tymax = (bb.max.y - r.origin.y) * inv_ray_d.y;
+	if (r.inv_ray_d.x < 0) swap(tmin, tmax);
 
-    if (inv_ray_d.y < 0) swap(tymin, tymax);
+	float tymin = (bb.min.y - r.ray.origin.y) * r.inv_ray_d.y;
+	float tymax = (bb.max.y - r.ray.origin.y) * r.inv_ray_d.y;
 
-    if ((tmin > tymax) || (tymin > tmax))
-        return false;
+	if (r.inv_ray_d.y < 0) swap(tymin, tymax);
 
-    if (tymin > tmin)
-        tmin = tymin;
+	if ((tmin > tymax) || (tymin > tmax))
+		return false;
 
-    if (tymax < tmax)
-        tmax = tymax;
+	if (tymin > tmin)
+		tmin = tymin;
 
-    float tzmin = (bb.min.z - r.origin.z) * inv_ray_d.z;
-    float tzmax = (bb.max.z - r.origin.z) * inv_ray_d.z;
+	if (tymax < tmax)
+		tmax = tymax;
 
-    if (inv_ray_d.z < 0) swap(tzmin, tzmax);
+	float tzmin = (bb.min.z - r.ray.origin.z) * r.inv_ray_d.z;
+	float tzmax = (bb.max.z - r.ray.origin.z) * r.inv_ray_d.z;
 
-    if ((tmin > tzmax) || (tzmin > tmax))
-        return false;
+	if (r.inv_ray_d.z < 0) swap(tzmin, tzmax);
 
-    if (tzmin > tmin)
-        tmin = tzmin;
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return false;
 
-    if (tzmax < tmax)
-        tmax = tzmax;
+	if (tzmin > tmin)
+		tmin = tzmin;
 
-    return true;
-    */
+	if (tzmax < tmax)
+		tmax = tzmax;
 
+	return true;
+	*/
 }
