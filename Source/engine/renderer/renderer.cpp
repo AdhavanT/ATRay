@@ -1,8 +1,6 @@
 #include "renderer.h"
 #include "utilities/ATP/atp.h"
 
-f32 tolerance = 0.0001f;
-
 static inline vec3f get_reflection(vec3f incident, vec3f normal)
 {
 	normalize(normal);

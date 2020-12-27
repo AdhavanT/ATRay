@@ -231,11 +231,14 @@ struct Vec3
 
 	FORCEDINLINE Vec3<t> operator + (Vec3<t> n) { Vec3<t> ans = { x + n.x, y + n.y, z + n.z }; return ans; };
 	FORCEDINLINE void operator += (Vec3<t> n) { x += n.x; y += n.y; z += n.z; };
+	FORCEDINLINE void operator += (f32 n) { x += n; y += n; z += n; };
+
 
 	FORCEDINLINE Vec3<t> operator - () { Vec3<t> ans = { -x, -y, -z }; return ans; };
 
 	FORCEDINLINE Vec3<t> operator - (Vec3<t> n) { Vec3<t> ans = { x - n.x, y - n.y, z - n.z }; return ans; };
 	FORCEDINLINE void operator -= (Vec3<t> n) { x -= n.x; y -= n.y; z -= n.z; };
+	FORCEDINLINE void operator -= (f32 n) { x -= n; y -= n; z -= n; };
 
 	FORCEDINLINE bool operator != (Vec3<t> b) { return (x == b.x && (y == b.y && z == b.z)); };
 

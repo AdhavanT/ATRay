@@ -101,7 +101,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 
 	pl_debug_print("\nLoading Assets...\n");
 	Model monkey = {};
-	load_model_data(monkey.data, "Assets\\Monkey.obj", tpool);
+	load_model_data(monkey.data, "Assets\\Deer.obj", tpool);
 	monkey.surrounding_aabb = get_AABB(monkey.data);
 	resize_scale(monkey, 4);
 	translate_to(monkey, { 3.f,2.f,-5.f });
@@ -112,7 +112,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	ATP_START(build_KD_tree);
 	monkey.kd_tree.max_divisions = KD_Divisions::TWO;
 	monkey.kd_tree.division_method = KD_Division_Method::SAH;
-	monkey.kd_tree.max_no_faces_per_node = 100;
+	monkey.kd_tree.max_no_faces_per_node = (monkey.data.faces_vertices.size * 1)/10;	//use "bucket size" or density value factor to calculate this.
 	build_KD_tree(monkey.data, monkey.kd_tree);
 	ATP_END(build_KD_tree);
 	//monkey.data.faces_vertices.clear();

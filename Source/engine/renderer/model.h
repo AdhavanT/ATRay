@@ -3,8 +3,6 @@
 #include "aabb.h"
 #include "ray.h"
 
-extern f32 tolerance;
-
 struct TriangleVertices
 {
 	vec3f a;
@@ -57,6 +55,8 @@ inline AABB get_AABB(ModelData& data)
 	AABB ret = {};
 	ret.max = { x_max,y_max,z_max };
 	ret.min = { x_min, y_min, z_min };
+	ret.max += tolerance;
+	ret.min -= tolerance;
 	return (ret);
 }
 

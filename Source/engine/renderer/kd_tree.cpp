@@ -7,130 +7,129 @@ FORCEDINLINE f32 area_of_triangle(TriangleVertices tri)
 	return mag(cross(ac, ab))/2;
 }
 
-static void build_binary_kd_tree(KD_Tree* tree_)
+static void build_binary_kd_tree(KD_Tree* tree)
 {
-	DBuffer<uint32, 1000, 1000, uint32> node_stack;	//NOTE: stack stores node positions in tree as offsets (not using pointers cause tree can realloc when growing).
-													
-	node_stack.add(0);	//adding root into stack
+	DBuffer<uint32, 1000, 1000> node_stack;
+
+	node_stack.add(0);
+
 
 	while (node_stack.length > 0)
 	{
-		KD_Node* current_node = tree_->tree.front + node_stack[node_stack.length - 1];
-		node_stack.length--;	//popping the stack
-		KD_Tree& tree = *tree_;
-		if (current_node->primitives.size > (uint32)tree.max_no_faces_per_node)
+
+		KD_Node* current_node = &tree->tree[node_stack[node_stack.length - 1]];
+		node_stack.length--;
+		if (current_node->primitives.size > tree->max_no_faces_per_node)
 		{
-			current_node->children_start_position = tree.tree.length;
-			KD_Node* l, * r;
-
-			l = tree.tree.add({ 0 });
-			r = tree.tree.add({ 0 });
-			current_node = tree_->tree.front + node_stack.front[node_stack.length];	//reassigning current_node in case realloc happens in tree. 
-
+			//find divison point 
+			vec3f division_point;
+			switch (tree->division_method)
 			{
-				vec3f division_point;
-				switch (tree.division_method)
-				{
-					case KD_Division_Method::CENTER:
-					{
-						division_point = (current_node->aabb.max - current_node->aabb.min) / 2; //TODO: find SAH point
-						division_point += current_node->aabb.min;
-					}break;
-					case KD_Division_Method::SAH:
-					{
-						//Finding center using geometric decomposition
-						vec3f sum = {};
-						f64 sum_of_areas = 0;
-						for (uint32 i = 0; i < current_node->primitives.size; i++)
-						{
-							vec3f tri_center = (current_node->primitives[i].face_vertices.a + current_node->primitives[i].face_vertices.b + current_node->primitives[i].face_vertices.c) / 3;
-							f32 area = area_of_triangle(current_node->primitives[i].face_vertices);
-							sum += tri_center * area;
-							sum_of_areas += area;
-						}
-						division_point = sum / (f32)sum_of_areas;
-					}break;
-					default:
-						ASSERT(FALSE);	//Improper Division method
-						break;
-				}
-
-				AABB& p = current_node->aabb;
-				vec3f& v = division_point;
-				ASSERT(is_inside(v, p));	//THis occurs in SAH mode when most of the primitive areas are outside the aabb. Must abort dividing current_node and make it a leaf.
-				//cuts along Z-Y plane.
-				AABB& left = l->aabb, & right = r->aabb;
-				left.min = p.min;
-				left.max.x = v.x;
-				left.max.y = p.max.y;
-				left.max.z = p.max.z;
-
-				right.min.x = v.x;
-				right.min.y = p.min.x;
-				right.min.z = p.min.z;
-				right.max = p.max;
-			}
-
-			//TODO: MAKE AND USE A MEMORY ARENA.
-			//ASSESS: This is the place where a memory arena might be much faster. Using a DBuffer will require either a large amount of memory be allocated for each node, or lots of reallocs happening.
-
+			case KD_Division_Method::CENTER:
 			{
-				//filling subnode primitives
-				DBuffer<KD_Primitive,0,0, uint32> primitives_left, primitives_right;
-				uint32 temp_buffer_cap_and_addon = (current_node->primitives.size / 2);
-				primitives_left.capacity = temp_buffer_cap_and_addon;
-				primitives_left.overflow_addon = temp_buffer_cap_and_addon;
-				primitives_right.capacity = temp_buffer_cap_and_addon;
-				primitives_right.overflow_addon = temp_buffer_cap_and_addon;
+				division_point = (current_node->aabb.max - current_node->aabb.min) / 2; //TODO: find SAH point
+				division_point += current_node->aabb.min;
 
+				ASSERT(is_inside(division_point, current_node->aabb));	//The division point is not inside the the aabb for some reason
+
+			}break;
+			case KD_Division_Method::SAH:
+			{
+				//Finding center using geometric decomposition
+				vec3f sum = {};
+				f64 sum_of_areas = 0;
 				for (uint32 i = 0; i < current_node->primitives.size; i++)
 				{
-					b32 a_left = FALSE, b_left = FALSE, c_left = FALSE;
-					a_left = is_inside(current_node->primitives[i].face_vertices.a, l->aabb);
-					b_left = is_inside(current_node->primitives[i].face_vertices.b, l->aabb);
-					c_left = is_inside(current_node->primitives[i].face_vertices.c, l->aabb);
-
-					b32 a_right = FALSE, b_right = FALSE, c_right = FALSE;
-					a_right = is_inside(current_node->primitives[i].face_vertices.a, r->aabb);
-					b_right = is_inside(current_node->primitives[i].face_vertices.b, r->aabb);
-					c_right = is_inside(current_node->primitives[i].face_vertices.c, r->aabb);
-
-					if (a_left || b_left || c_left)	//a vertex is in left aabb
-					{
-						primitives_left.add(current_node->primitives[i]);
-					}
-					if (a_right || b_right || c_right) //a vertex is in right aabb
-					{
-						primitives_right.add(current_node->primitives[i]);
-					}
+					vec3f tri_center = (current_node->primitives[i].face_vertices.a + current_node->primitives[i].face_vertices.b + current_node->primitives[i].face_vertices.c) / 3;
+					f32 area = area_of_triangle(current_node->primitives[i].face_vertices);
+					sum += tri_center * area;
+					sum_of_areas += area;
 				}
-				l->primitives.front = primitives_left.front;
-				l->primitives.size = primitives_left.length;
-				r->primitives.front = primitives_right.front;
-				r->primitives.size = primitives_right.length;
-			}
+				division_point = sum / (f32)sum_of_areas;
 
+				if (!is_inside(division_point, current_node->aabb))//This occurs in SAH mode when most of the primitive areas are outside the aabb. Must resort to aborting dividing current_node and make it a leaf.
+				{
+					//making current_node a leaf node
+					current_node->has_children = FALSE;
+					continue;
+				}
+
+			}break;
+			default:
+				ASSERT(FALSE);	//Improper Division method
+				break;
+			}
+			KD_Node left = {}, right = {};
+
+			AABB& p = current_node->aabb;
+			vec3f& v = division_point;
+			//cuts along Z-Y plane.
+			AABB& l = left.aabb, & r = right.aabb;
+			l.min = p.min;
+			l.max.x = v.x;
+			l.max.y = p.max.y;
+			l.max.z = p.max.z;
+
+			r.min.x = v.x;
+			r.min.y = p.min.y;
+			r.min.z = p.min.z;
+			r.max = p.max;
+
+			//filling subnode primitives
+			DBuffer<KD_Primitive, 0, 0, uint32> primitives_left, primitives_right;
+			uint32 temp_buffer_cap_and_addon = (current_node->primitives.size / 2);	//using half the parent nodes primitive size as a cap and overflow addon value
+			primitives_left.capacity = temp_buffer_cap_and_addon;
+			primitives_left.overflow_addon = temp_buffer_cap_and_addon;
+			primitives_right.capacity = temp_buffer_cap_and_addon;
+			primitives_right.overflow_addon = temp_buffer_cap_and_addon;
+
+
+			for (uint32 i = 0; i < current_node->primitives.size; i++)
+			{
+
+				//testing if triangle is in the left or right or both
+				b8 a_left = FALSE, b_left = FALSE, c_left = FALSE;
+				a_left = is_inside(current_node->primitives[i].face_vertices.a, left.aabb);
+				b_left = is_inside(current_node->primitives[i].face_vertices.b, left.aabb);
+				c_left = is_inside(current_node->primitives[i].face_vertices.c, left.aabb);
+
+				b8 a_right = FALSE, b_right = FALSE, c_right = FALSE;
+				a_right = is_inside(current_node->primitives[i].face_vertices.a, right.aabb);
+				b_right = is_inside(current_node->primitives[i].face_vertices.b, right.aabb);
+				c_right = is_inside(current_node->primitives[i].face_vertices.c, right.aabb);
+
+				if (a_left || b_left || c_left)	//a vertex is in left aabb
+				{
+					primitives_left.add(current_node->primitives[i]);
+				}
+				if (a_right || b_right || c_right) //a vertex is in right aabb
+				{
+					primitives_right.add(current_node->primitives[i]);
+				}
+			}
+			left.primitives.front = primitives_left.front;
+			left.primitives.size = primitives_left.length;
+			right.primitives.front = primitives_right.front;
+			right.primitives.size = primitives_right.length;
+
+			ASSERT(left.primitives.size + right.primitives.size >= current_node->primitives.size);
 			current_node->primitives.clear();
 
+			current_node->children_start_position = tree->tree.length;
 
-			node_stack.add(current_node->children_start_position);	//pushing left child node into stack
-			node_stack.add(current_node->children_start_position + 1);	//pushing right child into stack
-			
+			//adding left and right to the tree
+			tree->tree.add_nocpy(left);
+			tree->tree.add_nocpy(right);
+
+			//adding left and right to be processed in node_stack
+			node_stack.add(current_node->children_start_position);
+			node_stack.add(current_node->children_start_position + 1);
 		}
 		else
 		{
 			current_node->has_children = FALSE;
 		}
 	}
-	node_stack.clear_buffer();
-	//verifying that non-leaf nodes have no primitives
-	/*for (int i = 0; i < tree_->tree.length; i++)
-	{
-		if (tree_->tree[i].has_children != 0 && tree_->tree[i].primitives.size != 0)
-		{
-			ASSERT(FALSE);
-		}
-	}*/
 }
 
 void build_KD_tree(ModelData mdl, KD_Tree& tree)
@@ -152,7 +151,11 @@ void build_KD_tree(ModelData mdl, KD_Tree& tree)
 		*prim = { tri, i };
 		prim++;
 	}
-	KD_Node* front = tree.tree.add_nocpy(root);
+	if (tree.tree.length > 0)
+	{
+		tree.tree.clear_buffer();
+	}
+	tree.tree.add_nocpy(root);
 
 	switch (tree.max_divisions)
 	{
@@ -184,7 +187,6 @@ struct TraversalData
 };
 
 //defined in renderer.cpp
-extern f32 tolerance;	
 
 static void traverse_two_subnode_tree(TraversalData& td, KD_Node* current_node)
 {

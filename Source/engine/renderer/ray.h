@@ -1,6 +1,8 @@
 #pragma once
 #include "PL/PL_math.h"
 
+static constexpr f32 tolerance = 0.0001f;
+
 
 struct Ray
 {

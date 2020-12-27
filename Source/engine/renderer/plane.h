@@ -2,8 +2,6 @@
 #include "material.h"
 #include "ray.h"
 
-extern f32 tolerance;
-
 struct Plane
 {
 	vec3f normal = { 0 };
