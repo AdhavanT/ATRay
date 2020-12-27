@@ -365,8 +365,8 @@ static void start_tile_render_thread(void* data)
 {
 	RenderInfo* info = (RenderInfo*)data;
 	RNG_Stream rng_stream;
-	rng_stream.state = get_hardware_entropy();
-	rng_stream.stream = (uint64)get_thread_id();
+	rng_stream.state = pl_get_hardware_entropy();
+	rng_stream.stream = (uint64)pl_get_thread_id();
 
 	while (render_tile_from_camera(*info, &rng_stream));
 }
@@ -417,7 +417,7 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 	//----for ATP profiling----
 	ATP_GET_TESTTYPE(Tiles)->tests.size = info.twq.jobs.size;
 	ATP_GET_TESTTYPE(Tiles)->tests.finished_tests = 0;
-	ATP_GET_TESTTYPE(Tiles)->tests.front = (ATP::TestInfo*)buffer_calloc(ATP_GET_TESTTYPE(Tiles)->tests.size * sizeof(ATP::TestInfo));
+	ATP_GET_TESTTYPE(Tiles)->tests.front = (ATP::TestInfo*)pl_buffer_alloc(ATP_GET_TESTTYPE(Tiles)->tests.size * sizeof(ATP::TestInfo));
 
 
 	activate_pool(tpool, start_tile_render_thread, &info);
@@ -426,7 +426,7 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 
 b32 wait_for_render_from_camera_to_finish(RenderInfo& info,ThreadPool& tpool, uint32 ms_to_wait_for)
 {
-	if (wait_for_all_threads(tpool.threads.size, &tpool.threads[0].handle, ms_to_wait_for))
+	if (pl_wait_for_all_threads(tpool.threads.size, &tpool.threads[0].handle, ms_to_wait_for))
 	{
 		return TRUE;
 	}

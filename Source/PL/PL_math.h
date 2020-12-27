@@ -53,9 +53,9 @@ f64 F64_POWER_10[48] =
 #define ArrayCount(array) (sizeof(array) / sizeof(array[0]))
 
 //-----------------------
-void buffer_free(void* buffer);
-void* buffer_calloc(size_t size);
-void* buffer_realloc(void* block, size_t new_size);
+void pl_buffer_free(void* buffer);
+void* pl_buffer_alloc(size_t size);
+void* pl_buffer_resize(void* block, size_t new_size);
 //-----------------------
 // Collections
 //----------------------
@@ -73,12 +73,12 @@ struct DBuffer
 		length++;
 		if (front == 0)		//Buffer was not initilized and is being initialized here. 
 		{
-			front = (t*)buffer_calloc(capacity * sizeof(t));
+			front = (t*)pl_buffer_alloc(capacity * sizeof(t));
 		}
 		if (length > capacity)
 		{
 			capacity = capacity + overflow_addon;
-			t* temp = (t*)buffer_realloc(front, capacity * sizeof(t));
+			t* temp = (t*)pl_buffer_resize(front, capacity * sizeof(t));
 			ASSERT(temp);	//Not enough memory to realloc, or buffer was never initialized and realloc is trying to allocate to null pointer
 			front = temp;
 		}
@@ -95,12 +95,12 @@ struct DBuffer
 		length++;
 		if (front == 0)		//Buffer was not initilized and is being initialized here. 
 		{
-			front = (t*)buffer_calloc(capacity * sizeof(t));
+			front = (t*)pl_buffer_alloc(capacity * sizeof(t));
 		}
 		if (length > capacity)
 		{
 			capacity = capacity + overflow_addon;
-			t* temp = (t*)buffer_realloc(front, capacity * sizeof(t));
+			t* temp = (t*)pl_buffer_resize(front, capacity * sizeof(t));
 			ASSERT(temp);	//Not enough memory to realloc, or buffer was never initialized and realloc is trying to allocate to null pointer
 			front = temp;
 		}
@@ -115,7 +115,7 @@ struct DBuffer
 	FORCEDINLINE void clear_buffer()
 	{
 		length = 0;
-		buffer_free(front);
+		pl_buffer_free(front);
 	}
 
 	FORCEDINLINE t& operator [](size_type index)
@@ -149,14 +149,14 @@ struct FDBuffer
 	FORCEDINLINE t* allocate(size_type size_)
 	{
 		size = size_;
-		front = (t*)buffer_calloc(size * sizeof(t));
+		front = (t*)pl_buffer_alloc(size * sizeof(t));
 		return front;
 	}
 	//clears size and deallocates memory 
 	FORCEDINLINE void clear()
 	{
 		size = 0;
-		buffer_free(front);
+		pl_buffer_free(front);
 	}
 	FORCEDINLINE t& operator [](size_type index)
 	{

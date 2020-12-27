@@ -60,7 +60,7 @@ namespace BMP_FILE_FORMAT
 		bmp.bytes_per_pixel = 4;
 		bmp.height = height;
 		bmp.width = width;
-		bmp.buffer_memory = buffer_calloc(bmp.size());
+		bmp.buffer_memory = pl_buffer_alloc(bmp.size());
 	}
 
 	static bool Write_To_File(BitmapBuffer& bmb, const char* file_name)
@@ -96,24 +96,24 @@ namespace BMP_FILE_FORMAT
 		uint32 file_id = 0;
 		int length = strlen((char*)file_name);
 
-		char* new_name = (char*)buffer_malloc(length + 8);
+		char* new_name = (char*)pl_buffer_alloc(length + 8);
 
-		format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
+		pl_format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 
 		//Checking if another file exists with same name
-		while (!create_file(&file, new_name))
+		while (!pl_create_file(&file, new_name))
 		{
 			file_id++;
-			format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
+			pl_format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 		}
 		if (file)
 		{
-			append_to_file(file, &bmp.bfh, 14);
-			append_to_file(file,&bmp.bih, sizeof(bmp.bih));
-			append_to_file(file, bmp.bitmap_buffer.buffer_memory, bmp.bitmap_buffer.size());
-			close_file_handle(file);
+			pl_append_to_file(file, &bmp.bfh, 14);
+			pl_append_to_file(file,&bmp.bih, sizeof(bmp.bih));
+			pl_append_to_file(file, bmp.bitmap_buffer.buffer_memory, bmp.bitmap_buffer.size());
+			pl_close_file_handle(file);
 		}
-		buffer_free(new_name);
+		pl_buffer_free(new_name);
 		return true;
 	}
 

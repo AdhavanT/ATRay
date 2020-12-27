@@ -4,6 +4,11 @@
 #include "utilities/ATP/atp.h"
 #include "engine/tools/OBJ_loader.h"
 
+//TODO:
+//Bugs:
+//1.memory allocation fails when trying to build tree with low no of faces per node.Implement memory arena or something.
+//2.Tree unable to add triangles that are bigger(all 3 vertices outside node) than node aabb but are still inside.must find another way to detect if triangle is inside node.
+
 //TODO: remove this. This is for debug purposes. 
 static Model make_model_from_aabb(AABB box)
 {
@@ -64,10 +69,13 @@ void PL_entry_point(PL& pl)
 	PL_initialize_timing(pl.time);
 	render_app(pl,texture, thread_pool);
 
-	buffer_free(texture.bmb.buffer_memory);
+	pl_buffer_free(texture.bmb.buffer_memory);
 	
 	//NOTE: by now, none of the threads should be running anything. 
-	close_threads((uint32)thread_pool.threads.size, &thread_pool.threads.front->handle);
+	for (int i = 0; i < thread_pool.threads.size; i++)
+	{
+		pl_close_thread(&thread_pool.threads[i].handle);
+	}
 	thread_pool.threads.clear();
 }
 
@@ -91,7 +99,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 
 	ATP_START(load_assets);
 
-	debug_print("\nLoading Assets...\n");
+	pl_debug_print("\nLoading Assets...\n");
 	Model monkey = {};
 	load_model_data(monkey.data, "Assets\\Monkey.obj", tpool);
 	monkey.surrounding_aabb = get_AABB(monkey.data);
@@ -103,8 +111,8 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 
 	ATP_START(build_KD_tree);
 	monkey.kd_tree.max_divisions = KD_Divisions::TWO;
-	monkey.kd_tree.division_method = KD_Division_Method::CENTER;
-	monkey.kd_tree.max_no_faces_per_node = 800;
+	monkey.kd_tree.division_method = KD_Division_Method::SAH;
+	monkey.kd_tree.max_no_faces_per_node = 100;
 	build_KD_tree(monkey.data, monkey.kd_tree);
 	ATP_END(build_KD_tree);
 	//monkey.data.faces_vertices.clear();
@@ -182,7 +190,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	prep_scene(scene);
 	ATP_END(prep_scene);
 
-	debug_print("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
+	pl_debug_print("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
 	
 	RenderInfo info;
 	info.camera_tex = &texture;
@@ -208,7 +216,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 		if (info.twq.jobs_done > last_tile)
 		{
 			char buffer[512];
-			format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width, pl.window.height, pl.core_count, info.twq.jobs_done, info.twq.jobs.size);
+			pl_format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width, pl.window.height, pl.core_count, info.twq.jobs_done, info.twq.jobs.size);
 			pl.window.title = buffer;
 			PL_push_window(pl.window, TRUE);
 			last_tile = info.twq.jobs_done;
@@ -221,12 +229,12 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	ATP_END(render_from_camera);
 	
 
-	debug_print("\nCompleted:\n");
+	pl_debug_print("\nCompleted:\n");
 	
 	print_out_tests(pl.time);
 	
-	debug_print("	Total Rays Shot: %I64i rays\n", info.total_ray_casts);
-	debug_print("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)info.total_ray_casts);
+	pl_debug_print("	Total Rays Shot: %I64i rays\n", info.total_ray_casts);
+	pl_debug_print("	Millisecond Per Ray: %.*f ms/ray\n", 8, ATP::get_ms_from_test(*ATP::lookup_testtype("render_from_camera")) / (f64)info.total_ray_casts);
 
 	int32 tile_on_mouse = -1;
 	ATP::TestType* Tiles_TestType = 0;
@@ -260,7 +268,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 				uint64 ray_casts_on_tile = info.twq.jobs[tile_on_mouse].ray_casts;
 				f64 tile_ms = ((f64)cycles_to_render_tile / (f64)pl.time.cycles_per_second) * 1000;
 				char buffer[512];
-				format_print(buffer, 512, "Rendered:Tile(%i/%i) milliseconds to render tile:%.*f ms | rays cast on tile:%i64  ",tile_on_mouse+1,info.twq.jobs.size, 3,tile_ms, ray_casts_on_tile);
+				pl_format_print(buffer, 512, "Rendered:Tile(%i/%i) milliseconds to render tile:%.*f ms | rays cast on tile:%i64  ",tile_on_mouse+1,info.twq.jobs.size, 3,tile_ms, ray_casts_on_tile);
 				pl.window.title = buffer;
 				PL_push_window(pl.window, TRUE);
 			}
@@ -269,7 +277,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 		else if (pl.input.mouse.right.down && pl.input.mouse.is_in_window)
 		{
 			char buffer[512];
-			format_print(buffer, 512, "Pixel: [%i, %i] ", pl.input.mouse.position_x, pl.input.mouse.position_y);
+			pl_format_print(buffer, 512, "Pixel: [%i, %i] ", pl.input.mouse.position_x, pl.input.mouse.position_y);
 			pl.window.title = buffer;
 			PL_push_window(pl.window, TRUE);
 		}
@@ -303,24 +311,24 @@ static void print_out_tests(PL_Timing& pl)
 	{
 		if (front->type == ATP::TestTypeFormat::MULTI)
 		{
-			debug_print("	MULTI TEST (ATP->%s):\n", front->name);
+			pl_debug_print("	MULTI TEST (ATP->%s):\n", front->name);
 			ATP::TestInfo* index = front->tests.front;
 			uint64 total = 0;
 			for (uint32 i = 0; i < front->tests.size; i++)
 			{
 				total += index->test_run_cycles;
 				f64 ms = (index->test_run_cycles * 1000 / (f64)pl.cycles_per_second);
-				debug_print("		index:%i:%.*f ms (%.*f s),%I64u\n", i, 3, ms, 4, ms / 1000, index->test_run_cycles);
+				pl_debug_print("		index:%i:%.*f ms (%.*f s),%I64u\n", i, 3, ms, 4, ms / 1000, index->test_run_cycles);
 				index++;
 			}
 			f64 ms = (total * 1000 / (f64)pl.cycles_per_second);
-			debug_print("	total:%.*f ms (%.*f s), %I64u\n", 3, ms, 4, ms / 1000, total);
+			pl_debug_print("	total:%.*f ms (%.*f s), %I64u\n", 3, ms, 4, ms / 1000, total);
 
 		}
 		else
 		{
 			f64 ms = ATP::get_ms_from_test(*front);
-			debug_print("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n", front->name, 3, ms, 4, ms / 1000);
+			pl_debug_print("	Time Elapsed(ATP->%s):%.*f ms (%.*f s)\n", front->name, 3, ms, 4, ms / 1000);
 		}
 		front++;
 	}
