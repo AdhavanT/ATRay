@@ -101,18 +101,18 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 
 	pl_debug_print("\nLoading Assets...\n");
 	Model monkey = {};
-	load_model_data(monkey.data, "Assets\\Deer.obj", tpool);
+	load_model_data(monkey.data, "Assets\\Dragon.obj", tpool);
 	monkey.surrounding_aabb = get_AABB(monkey.data);
-	resize_scale(monkey, 4);
-	translate_to(monkey, { 3.f,2.f,-5.f });
+	//resize_scale(monkey, 3);
+	translate_to(monkey, { 0.f,-15.f,-38.f });
 
 	//Model monkey_aabb = make_model_from_aabb(monkey_scale);
 	ATP_END(load_assets);
 
 	ATP_START(build_KD_tree);
-	monkey.kd_tree.max_divisions = KD_Divisions::TWO;
+	monkey.kd_tree.max_divisions = KD_Divisions::FOUR;
 	monkey.kd_tree.division_method = KD_Division_Method::SAH;
-	monkey.kd_tree.max_no_faces_per_node = (monkey.data.faces_vertices.size * 1)/10;	//use "bucket size" or density value factor to calculate this.
+	monkey.kd_tree.max_no_faces_per_node = (uint32)((200.f/(1570.f * 8)) * (f32)monkey.data.faces_vertices.size);	//use "bucket size" or density value factor to calculate this.
 	build_KD_tree(monkey.data, monkey.kd_tree);
 	ATP_END(build_KD_tree);
 	//monkey.data.faces_vertices.clear();
@@ -127,7 +127,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	rs.bounce_limit = 5;
 
 
-	set_camera(cm, { 0.f,2.f,0.f }, { 0.f, -0.5f,-1.f }, rs, 1.0f);
+	set_camera(cm, { 0.1f,2.f,0.f }, { -.1f, -0.5f,-1.f }, rs, 1.0f);
 
 	Scene scene;
 	Material skybox = { {0.3f,0.4f,0.5f}, {0.2f,0.3f,0.4f},0.3f };
@@ -161,7 +161,6 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	spr[1].radius = 1.f;    
 	spr[1].material = &scene.materials[2];
 
-
 	pln[0].distance = -7.f;
 	pln[0].normal = { 1.f,0.f,0.f };
 	pln[0].material = &scene.materials[3];
@@ -181,10 +180,10 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	
 	//scene.models.add_nocpy(monkey_aabb);
 	scene.models.add_nocpy(monkey);
-	scene.planes.add(pln[0]);
-	scene.planes.add(pln[1]);
-	scene.spheres.add(spr[0]);
-	scene.spheres.add(spr[1]);
+	//scene.planes.add(pln[0]);
+	//scene.planes.add(pln[1]);
+	//scene.spheres.add(spr[0]);
+	//scene.spheres.add(spr[1]);
 
 	ATP_START(prep_scene);
 	prep_scene(scene);

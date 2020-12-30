@@ -29,10 +29,10 @@ static inline b8 is_inside(vec3f point, AABB box)
 
 static inline b32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
 {
-	if (is_inside(r.ray.origin, bb))
+	/*if (is_inside(r.ray.origin, bb))
 	{
 		return true;
-	}
+	}*/
 
 	//optimized version 
 	float tmin, tmax, tymin, tymax, tzmin, tzmax;

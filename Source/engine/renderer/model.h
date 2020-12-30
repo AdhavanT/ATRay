@@ -124,9 +124,9 @@ inline void translate_to(Model& mdl, vec3f new_center)
 {
 	AABB& aabb = mdl.surrounding_aabb;
 
-	//vec3f old_center = aabb.min + (aabb.max - aabb.min) / 2;
+	vec3f old_center = aabb.min + (aabb.max - aabb.min) / 2;
 
-	vec3f old_center = (aabb.max - aabb.min) / 2;
+	//vec3f old_center = (aabb.max - aabb.min) / 2;
 	vec3f translation = new_center - old_center;
 
 	for (uint32 i = 0; i < mdl.data.vertices.size; i++)
