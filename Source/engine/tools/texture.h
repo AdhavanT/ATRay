@@ -2,12 +2,6 @@
 
 #include "PL/PL_math.h"
 
-#ifdef _DEBUG
-#define ASSERT(x) if(!(x)) __debugbreak();
-#else
-#define ASSERT(X)
-#endif 
-
 enum struct TextureFileType
 {
 	BMP
@@ -30,7 +24,7 @@ struct Texture
 
 
 //takes RGB color and sets it to [x,y] point on bitmap
-inline void Set_Pixel(const Vec3<uint8>& color, Texture& texture, int32 x, int32 y)
+FORCEDINLINE void Set_Pixel(const Vec3<uint8>& color, Texture& texture, int32 x, int32 y)
 {
 	if (texture.file_type == TextureFileType::BMP)
 	{

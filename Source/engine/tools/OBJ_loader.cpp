@@ -1,5 +1,5 @@
 #include "OBJ_loader.h"
-#include "utilities/fileio.h"
+#include "utilities/parser.h"
 #include "work_queue.h"
 
 //Possible Optimizations:
@@ -182,7 +182,7 @@ static void start_parse_chunk_thread(void* chunks_)
 
 	while (parse_chunks(*chunks))
 	{
-		debug_print("\rChunks parsed: %i/%i", chunks->jobs_done, chunks->jobs.size);
+		pl_debug_print("\rChunks parsed: %i/%i", chunks->jobs_done, chunks->jobs.size);
 	}
 }
 
@@ -212,11 +212,11 @@ static void join_chunks(WorkQueue<ParseDataChunk>& chunks_, ModelData& chunk)
 
 	for (int i = 0; i < chunks_.jobs.size; i++)
 	{
-		buffer_copy(ptr_tex_chunk, chunks_.jobs[i].chunk_data.tex_coords.front, chunks_.jobs[i].chunk_data.tex_coords.length * sizeof(vec3f));
-		buffer_copy(ptr_nor_chunk, chunks_.jobs[i].chunk_data.normals.front, chunks_.jobs[i].chunk_data.normals.length * sizeof(vec3f));
-		buffer_copy(ptr_vert_chunk, chunks_.jobs[i].chunk_data.vertices.front, chunks_.jobs[i].chunk_data.vertices.length * sizeof(vec3f));
-		buffer_copy(ptr_face_chunk, chunks_.jobs[i].chunk_data.faces_vertices.front, chunks_.jobs[i].chunk_data.faces_vertices.length * sizeof(FaceVertices));
-		buffer_copy(ptr_face_data_chunk, chunks_.jobs[i].chunk_data.faces_data.front, chunks_.jobs[i].chunk_data.faces_data.length * sizeof(FaceData));
+		pl_buffer_copy(ptr_tex_chunk, chunks_.jobs[i].chunk_data.tex_coords.front, chunks_.jobs[i].chunk_data.tex_coords.length * sizeof(vec3f));
+		pl_buffer_copy(ptr_nor_chunk, chunks_.jobs[i].chunk_data.normals.front, chunks_.jobs[i].chunk_data.normals.length * sizeof(vec3f));
+		pl_buffer_copy(ptr_vert_chunk, chunks_.jobs[i].chunk_data.vertices.front, chunks_.jobs[i].chunk_data.vertices.length * sizeof(vec3f));
+		pl_buffer_copy(ptr_face_chunk, chunks_.jobs[i].chunk_data.faces_vertices.front, chunks_.jobs[i].chunk_data.faces_vertices.length * sizeof(FaceVertices));
+		pl_buffer_copy(ptr_face_data_chunk, chunks_.jobs[i].chunk_data.faces_data.front, chunks_.jobs[i].chunk_data.faces_data.length * sizeof(FaceData));
 
 		ptr_face_chunk += chunks_.jobs[i].chunk_data.faces_vertices.length;
 		ptr_face_data_chunk += chunks_.jobs[i].chunk_data.faces_data.length;
@@ -277,10 +277,18 @@ static inline void clear_OBJ_Model_Load_Chunk_Data(OBJ_Model_Load_Chunk_Data& da
 
 void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 {
-
-	uint32 file_size = get_file_size((char*)file_name);
-	char* buffer_front = (char*)buffer_malloc(file_size + 1);
-	load_file_into(buffer_front, file_size, (char*)file_name);
+	void* file;
+	if (!pl_get_file_handle((char*)file_name, &file))
+	{
+		ASSERT(FALSE);	//file doesn't exist or couldn't load file
+	}
+	uint32 file_size = (uint32)pl_get_file_size(file);
+	char* buffer_front = (char*)pl_buffer_alloc(file_size + 1);
+	if (!pl_load_file_into(file, buffer_front, file_size))
+	{
+		ASSERT(FALSE);	//couldn't load entire file
+	}
+	pl_close_file_handle(file);
 
 	if (buffer_front[file_size - 1] != 0)
 	{
@@ -290,7 +298,6 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	int32 no_of_chunks = threadpool.threads.size;
 	
 
-
 	int32 general_chunk_size = (file_size + (no_of_chunks - 1)) / no_of_chunks;
 	WorkQueue<ParseDataChunk>chunks;
 	ParseDataChunk* chunk = chunks.jobs.allocate_preserve_type_info(no_of_chunks);
@@ -299,7 +306,7 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	char* file_end = (buffer_front + (file_size - 1));
 	while (ptr < file_end)
 	{
-		uint32 cursor = 0;
+		uint64 cursor = 0;
 		chunk->start = ptr;
 		cursor += general_chunk_size;
 		if ((ptr + cursor) > file_end)
@@ -314,7 +321,7 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 			}
 		}
 		ptr += cursor;
-		chunk->chunk_size = cursor;
+		chunk->chunk_size = (int32)cursor;
 		chunk->end = ptr;
 		chunk++;
 		ptr++;
@@ -336,7 +343,7 @@ void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpo
 	if (chunks.jobs_done == chunks.jobs.size)
 	{
 		//Freeing buffer thats filled with obj file 
-		buffer_free(buffer_front);
+		pl_buffer_free(buffer_front);
 		//Deleting chunks
 		for (int i = 0; i < chunks.jobs.size; i++)
 		{

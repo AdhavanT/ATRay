@@ -211,7 +211,7 @@ void PL_cleanup_audio_capture(PL_Audio_Input& pl);
 struct PL_Input
 {
 	//TODO: Gamepad input
-	//PL_Input_Gamepad gamepad;
+	PL_Input_Gamepad gamepad;
 	union
 	{
 		PL_Digital_Button keys[PL_INPUT_KEYBOARD_MAX_KEYS];
@@ -233,7 +233,7 @@ struct PL
 	b32 running;
 	PL_Input input;
 	PL_Timing time;
-	//PL_Audio audio;
+	PL_Audio audio;
 	PL_Window window;
 	void* general_memory;
 };

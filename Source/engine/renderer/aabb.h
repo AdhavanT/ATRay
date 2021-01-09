@@ -16,88 +16,115 @@ struct AABB
     };
 };
 
-
-static inline b32 is_inside(vec3f& point, AABB& box)
+static inline b8 is_inside(vec3f point, AABB box)
 {
 	//TODO: Make this SIMD
-	b32 x_check = (point.x >= box.min.x) & (point.x <= box.max.x);
-	b32 y_check = (point.y >= box.min.y) & (point.y <= box.max.y);
-	b32 z_check = (point.z >= box.min.z) & (point.z <= box.max.z);
+	b8 x_check = (point.x >= box.min.x) && (point.x <= box.max.x);
+	b8 y_check = (point.y >= box.min.y) && (point.y <= box.max.y);
+	b8 z_check = (point.z >= box.min.z) && (point.z <= box.max.z);
 
-	return(x_check & y_check & z_check);
+	return(x_check && y_check && z_check);
 }
 
-
-//
-static inline b32 get_ray_AABB_intersection(Ray& r, AABB& bb, vec3f inv_ray_d, vec3i inv_signs)
+static inline f32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
 {
-	if (is_inside(r.origin, bb))
+	//optimized version 
+	f32 tmin, tmax, tymin, tymax, tzmin, tzmax;
+
+	tmin = (bb.bounds[r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tmax = (bb.bounds[1 - r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tymin = (bb.bounds[r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
+	tymax = (bb.bounds[1 - r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
+
+	if ((tmin > tymax) || (tymin > tmax))
+		return 0;
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
+
+	tzmin = (bb.bounds[r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
+	tzmax = (bb.bounds[1 - r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
+
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return 0;
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;
+	if(tmin > 0)
+	return tmin;
+	else if(tmax > 0)
 	{
-		return true;
+		return tmax;
 	}
-    
-    //optimized version 
-    float tmin, tmax, tymin, tymax, tzmin, tzmax;
+	return 0;
 
-    tmin = (bb.bounds[inv_signs[0]].x - r.origin.x) * inv_ray_d.x;
-    tmax = (bb.bounds[1 - inv_signs[0]].x - r.origin.x) * inv_ray_d.x;
-    tymin = (bb.bounds[inv_signs[1]].y - r.origin.y) * inv_ray_d.y;
-    tymax = (bb.bounds[1 - inv_signs[1]].y - r.origin.y) * inv_ray_d.y;
+}
 
-    if ((tmin > tymax) || (tymin > tmax))
-        return false;
-    if (tymin > tmin)
-        tmin = tymin;
-    if (tymax < tmax)
-        tmax = tymax;
+static inline b32 check_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
+{
+	//optimized version 
+	float tmin, tmax, tymin, tymax, tzmin, tzmax;
 
-    tzmin = (bb.bounds[inv_signs[2]].z - r.origin.z) * inv_ray_d.z;
-    tzmax = (bb.bounds[1 - inv_signs[2]].z - r.origin.z) * inv_ray_d.z;
+	tmin = (bb.bounds[r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tmax = (bb.bounds[1 - r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tymin = (bb.bounds[r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
+	tymax = (bb.bounds[1 - r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
 
-    if ((tmin > tzmax) || (tzmin > tmax))
-        return false;
-    if (tzmin > tmin)
-        tmin = tzmin;
-    if (tzmax < tmax)
-        tmax = tzmax;
+	if ((tmin > tymax) || (tymin > tmax))
+		return FALSE;
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
 
-    return true;
+	tzmin = (bb.bounds[r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
+	tzmax = (bb.bounds[1 - r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
 
-    //better to understand what is going on
-    /*float tmin = (bb.min.x - r.origin.x) * inv_ray_d.x;
-    float tmax = (bb.max.x - r.origin.x) * inv_ray_d.x;
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return FALSE;/*
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;*/
 
-    if (inv_ray_d.x < 0) swap(tmin, tmax);
+	return TRUE;
 
-    float tymin = (bb.min.y - r.origin.y) * inv_ray_d.y;
-    float tymax = (bb.max.y - r.origin.y) * inv_ray_d.y;
+	//better to understand what is going on
+	/*float tmin = (bb.min.x - r.ray.origin.x) * r.inv_ray_d.x;
+	float tmax = (bb.max.x - r.ray.origin.x) * r.inv_ray_d.x;
 
-    if (inv_ray_d.y < 0) swap(tymin, tymax);
+	if (r.inv_ray_d.x < 0) swap(tmin, tmax);
 
-    if ((tmin > tymax) || (tymin > tmax))
-        return false;
+	float tymin = (bb.min.y - r.ray.origin.y) * r.inv_ray_d.y;
+	float tymax = (bb.max.y - r.ray.origin.y) * r.inv_ray_d.y;
 
-    if (tymin > tmin)
-        tmin = tymin;
+	if (r.inv_ray_d.y < 0) swap(tymin, tymax);
 
-    if (tymax < tmax)
-        tmax = tymax;
+	if ((tmin > tymax) || (tymin > tmax))
+		return false;
 
-    float tzmin = (bb.min.z - r.origin.z) * inv_ray_d.z;
-    float tzmax = (bb.max.z - r.origin.z) * inv_ray_d.z;
+	if (tymin > tmin)
+		tmin = tymin;
 
-    if (inv_ray_d.z < 0) swap(tzmin, tzmax);
+	if (tymax < tmax)
+		tmax = tymax;
 
-    if ((tmin > tzmax) || (tzmin > tmax))
-        return false;
+	float tzmin = (bb.min.z - r.ray.origin.z) * r.inv_ray_d.z;
+	float tzmax = (bb.max.z - r.ray.origin.z) * r.inv_ray_d.z;
 
-    if (tzmin > tmin)
-        tmin = tzmin;
+	if (r.inv_ray_d.z < 0) swap(tzmin, tzmax);
 
-    if (tzmax < tmax)
-        tmax = tzmax;
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return false;
 
-    return true;
-    */
+	if (tzmin > tmin)
+		tmin = tzmin;
 
+	if (tzmax < tmax)
+		tmax = tzmax;
+
+	return true;
+	*/
 }

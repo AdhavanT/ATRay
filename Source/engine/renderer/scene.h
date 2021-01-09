@@ -4,6 +4,12 @@
 #include "model.h"
 #include "aabb.h"
 
+enum class PrimitiveTypes
+{
+	TRIANGLE,
+	SPHERE
+};
+
 struct Scene
 {
 	//TODO: These are DBuffers for now. They will be FDBuffers when scene loading is implemented

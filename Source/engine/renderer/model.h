@@ -3,8 +3,6 @@
 #include "aabb.h"
 #include "ray.h"
 
-extern f32 tolerance;
-
 struct TriangleVertices
 {
 	vec3f a;
@@ -15,6 +13,12 @@ struct TriangleVertices
 struct FaceVertices
 {
 	int32 vertex_indices[3] = { 0 };
+};
+
+struct TriangleIntersectionData
+{
+	uint32 face_index;
+	f32 u, v;
 };
 
 struct FaceData
@@ -33,15 +37,42 @@ struct ModelData
 	FDBuffer<FaceData, uint32> faces_data;			//data for respective faces (same index for faces_vertices)
 };
 
+//Gets the scale per axis of the model
+inline AABB get_AABB(ModelData& data)
+{
+	f32 x_max = -MAX_FLOAT, x_min = MAX_FLOAT, y_max = -MAX_FLOAT, y_min = MAX_FLOAT, z_max = -MAX_FLOAT, z_min = MAX_FLOAT;
+	for (uint32 i = 0; i < data.vertices.size; i++)
+	{
+		x_max = max(x_max, data.vertices[i].x);
+		x_min = min(x_min, data.vertices[i].x);
+
+		y_max = max(y_max, data.vertices[i].y);
+		y_min = min(y_min, data.vertices[i].y);
+
+		z_max = max(z_max, data.vertices[i].z);
+		z_min = min(z_min, data.vertices[i].z);
+	}
+	AABB ret = {};
+	ret.max = { x_max,y_max,z_max };
+	ret.min = { x_min, y_min, z_min };
+	ret.max += tolerance;
+	ret.min -= tolerance;
+	return (ret);
+}
+
+//NOTE: Placed here cause file uses definitions defined above
+#include "kd_tree.h"
+
 struct Model
 {	
+	KD_Tree kd_tree;
 	ModelData data;			
 	AABB surrounding_aabb;
 };
 
 //Uses Moller-Trumbore intersection algorithm
 //intersection_point = (1-u-v)*tri.a + u*tri.b + v*tri.c
-static inline f32 get_triangle_ray_intersection_culled(Ray& ray, TriangleVertices& tri, f32& u, f32& v)
+static FORCEDINLINE f32 get_triangle_ray_intersection_culled(Ray& ray, TriangleVertices& tri, f32& u, f32& v)
 {
 	vec3f ab, ac;
 	ab = tri.b - tri.a;
@@ -71,26 +102,7 @@ static inline f32 get_triangle_ray_intersection_culled(Ray& ray, TriangleVertice
 
 }
 
-//Gets the scale per axis of the model
-inline AABB get_AABB(Model& mdl)
-{
-	f32 x_max = -MAX_FLOAT, x_min = MAX_FLOAT, y_max = -MAX_FLOAT, y_min = MAX_FLOAT, z_max = -MAX_FLOAT, z_min = MAX_FLOAT;
-	for (uint32 i = 0; i < mdl.data.vertices.size; i++)
-	{
-		x_max = max(x_max, mdl.data.vertices[i].x);
-		x_min = min(x_min, mdl.data.vertices[i].x);
 
-		y_max = max(y_max, mdl.data.vertices[i].y);
-		y_min = min(y_min, mdl.data.vertices[i].y);
-
-		z_max = max(z_max, mdl.data.vertices[i].z);
-		z_min = min(z_min, mdl.data.vertices[i].z);
-	}
-	AABB ret = {};
-	ret.max = { x_max,y_max,z_max };
-	ret.min = { x_min, y_min, z_min };
-	return (ret);
-}
 
 //Resizes the model into a max scale 
 inline void resize_scale(Model& mdl ,f32 new_max_scale)
@@ -108,11 +120,26 @@ inline void resize_scale(Model& mdl ,f32 new_max_scale)
 	bounding_box.min = bounding_box.min * rescale_factor;
 }
 
+struct Bases
+{
+	vec3f origin;
+	vec3f x_axis;
+	vec3f y_axis;
+};
+
+inline void transform(Model& mdl, vec3f axis, f32 radian)
+{
+
+}
+
+
 inline void translate_to(Model& mdl, vec3f new_center)
 {
 	AABB& aabb = mdl.surrounding_aabb;
 
-	vec3f old_center = (aabb.max - aabb.min) / 2;
+	vec3f old_center = aabb.min + (aabb.max - aabb.min) / 2;
+
+	//vec3f old_center = (aabb.max - aabb.min) / 2;
 	vec3f translation = new_center - old_center;
 
 	for (uint32 i = 0; i < mdl.data.vertices.size; i++)

@@ -1,6 +1,8 @@
 #pragma once
 #include "PL/PL_math.h"
 
+static constexpr f32 tolerance = 0.0001f;
+
 
 struct Ray
 {
@@ -11,7 +13,14 @@ struct Ray
 	}
 };
 
-static inline void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
+struct Optimized_Ray
+{
+	Ray ray;
+	vec3f inv_ray_d;
+	vec3i inv_signs;
+};
+
+FORCEDINLINE void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
 {
 	ray.origin = origin_;
 	ray.direction = towards_ - origin_;

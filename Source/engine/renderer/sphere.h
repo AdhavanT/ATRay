@@ -4,9 +4,9 @@
 
 struct Sphere
 {
-	vec3f center;
-	f32 radius;
-	Material* material;
+	vec3f center = {0};
+	f32 radius = 0;
+	Material* material = 0;
 };
 
 static inline f32 get_sphere_ray_intersection(Ray& ray, Sphere& sphere)

@@ -1,9 +1,7 @@
 #include "renderer.h"
 #include "utilities/ATP/atp.h"
 
-f32 tolerance = 0.0001f;
-
-static inline vec3f get_reflection(vec3f incident, vec3f normal)
+static FORCEDINLINE vec3f get_reflection(vec3f incident, vec3f normal)
 {
 	normalize(normal);
 	vec3f reflection = -(normal * (2 * dot(incident, normal))) + incident;
@@ -11,41 +9,55 @@ static inline vec3f get_reflection(vec3f incident, vec3f normal)
 }
 
 
-struct TriangleIntersectionData
-{
-	Model* model;
-	uint32 face_index;
-	f32 u, v;
-};
-
 enum class ObjectType
 {
-	AABB,TRIANGLE, SPHERE, PLANE, SKYBOX
+	NONE,TRIANGLE, SPHERE, PLANE, SKYBOX
 };
 
 struct IntersectionData
 {
-	ObjectType type;
-	f32 distance_at_intersection;
-	vec3f normal;
-	Material* hit_material;
-	TriangleIntersectionData tid;
+	ObjectType type = {};
+	f32 distance_at_intersection = 0;
+	vec3f normal = {0};
+	Material* hit_material = 0;
+
+	TriangleIntersectionData tid = { 0 };
 };
 
-void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& intersection_data)
+struct RayCastTools
 {
-	f32 closest = MAX_FLOAT;
+	RNG_Stream* rng_stream;
+	DBuffer<KD_Node*>* hit_stack;
+	DBuffer<LeafNodePair>* leaf_stack;
+};
+
+void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& intersection_data, RayCastTools& tools)
+{
+	intersection_data.distance_at_intersection = MAX_FLOAT;
 	Sphere* nearest_sphere = nullptr;
 	Plane* nearest_plane = nullptr;
-	intersection_data.tid.model = nullptr;
+	Model* nearest_model = nullptr;
 
-	vec3f inv_dir = {1 / casted_ray.direction.x,1/casted_ray.direction.y, 1/casted_ray.direction.z};
-	vec3i sign = { inv_dir.x < 0, inv_dir.y < 0, inv_dir.z < 0 };
+	Optimized_Ray op_ray;
+	op_ray.ray = casted_ray;
+	op_ray.inv_ray_d = { 1 / casted_ray.direction.x,1 / casted_ray.direction.y, 1 / casted_ray.direction.z };
+	op_ray.inv_signs = { op_ray.inv_ray_d.x < 0, op_ray.inv_ray_d.y < 0, op_ray.inv_ray_d.z < 0 };
+
+	
 	for (int32 i = 0; i < scene.models.length; i++)
 	{
-		if (get_ray_AABB_intersection(casted_ray, scene.models[i].surrounding_aabb, inv_dir, sign))
+#if defined(USE_KD_TREE)
+		TriangleIntersectionData td;
+		f32 t = get_ray_kd_tree_intersection(op_ray, scene.models[i].kd_tree, td, tools.hit_stack->front, tools.leaf_stack->front);
+		if (t > tolerance && t < intersection_data.distance_at_intersection)
 		{
-			uint32 face_data_index = -1;	//assumes number of faces for model is less than 4,294,967,295 (MAX of UINT32)
+			intersection_data.distance_at_intersection = t;
+			intersection_data.tid = td;
+			nearest_model = &scene.models[i];
+		}
+#else
+		if (get_ray_AABB_intersection(op_ray, scene.models[i].surrounding_aabb))
+		{
 			for (uint32 j = 0; j < scene.models[i].data.faces_vertices.size; j++)
 			{
 				TriangleVertices tri;
@@ -56,20 +68,19 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 				f32 u, v;
 				//TODO: check if passing by value or manually inlining is faster for checking intersection
 				f32 t = get_triangle_ray_intersection_culled(casted_ray, tri, u, v);
-				if (t > tolerance && t < closest)
+				if (t > tolerance && t < intersection_data.distance_at_intersection)
 				{
-					closest = t;
+					intersection_data.distance_at_intersection = t;
 					intersection_data.tid.u = u;
 					intersection_data.tid.v = v;
-					face_data_index = j;
+					intersection_data.tid.face_index = j;
+					nearest_model = &scene.models[i];
 				}
 			}
-			if (face_data_index != -1)	//closest intersection was found for this model
-			{
-				intersection_data.tid.face_index = face_data_index;
-				intersection_data.tid.model = &scene.models[i];
-			}
-		}
+			
+		}		
+#endif
+
 	}
 
 	for (int i = 0; i < scene.spheres.length; i++)
@@ -77,9 +88,9 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		Sphere* spr = &scene.spheres[i];
 
 		f32 t = get_sphere_ray_intersection(casted_ray, *spr);
-		if (t > tolerance && t < closest)
+		if (t > tolerance && t < intersection_data.distance_at_intersection)
 		{
-			closest = t;
+			intersection_data.distance_at_intersection = t;
 			nearest_sphere = spr;
 		}
 	}
@@ -88,10 +99,10 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		Plane* pln = &scene.planes[i];
 
 		f32 t = get_plane_ray_intersection(casted_ray, *pln);
-		if (t > tolerance && t < closest)
+		if (t > tolerance && t < intersection_data.distance_at_intersection)
 		{
 			nearest_plane = pln;
-			closest = t;
+			intersection_data.distance_at_intersection = t;
 		}
 	}
 
@@ -106,21 +117,21 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 	else if (nearest_sphere != nullptr)	//nearest hit is a sphere
 	{
 		intersection_data.type = ObjectType::SPHERE;
-		intersection_data.normal = casted_ray.at(closest) - nearest_sphere->center;
+		intersection_data.normal = casted_ray.at(intersection_data.distance_at_intersection) - nearest_sphere->center;
 		intersection_data.hit_material = nearest_sphere->material;
 	}
 	//just some code to test if intersection works
-	else if (intersection_data.tid.model != nullptr)	//nearest hit is a triangle
+	else if (nearest_model != nullptr)	//nearest hit is a triangle
 	{
 		intersection_data.type = ObjectType::TRIANGLE;
 		//Smooth Shading
 		vec3f normal_a, normal_b, normal_c;
-		if (intersection_data.tid.model->data.normals.size > 0)
+		if (nearest_model->data.normals.size > 0)
 		{
-			FaceData* face_data = &intersection_data.tid.model->data.faces_data[intersection_data.tid.face_index];
-			normal_a = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[0]];
-			normal_b = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[1]];;
-			normal_c = intersection_data.tid.model->data.normals[face_data->vertex_normals_indices[2]];;
+			FaceData* face_data = &nearest_model->data.faces_data[intersection_data.tid.face_index];
+			normal_a = nearest_model->data.normals[face_data->vertex_normals_indices[0]];
+			normal_b = nearest_model->data.normals[face_data->vertex_normals_indices[1]];;
+			normal_c = nearest_model->data.normals[face_data->vertex_normals_indices[2]];;
 
 			//Interpolating normals
 			intersection_data.normal = normal_a * (1 - intersection_data.tid.u - intersection_data.tid.v) + normal_b * intersection_data.tid.u + normal_c * intersection_data.tid.v;
@@ -128,21 +139,21 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 		//regular shading
 		else
 		{
-			FaceVertices* face_v = &intersection_data.tid.model->data.faces_vertices[intersection_data.tid.face_index];
-			vec3f ab = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[1]];
-			vec3f ac = intersection_data.tid.model->data.vertices[face_v->vertex_indices[0]] - intersection_data.tid.model->data.vertices[face_v->vertex_indices[2]];
+			FaceVertices* face_v = &nearest_model->data.faces_vertices[intersection_data.tid.face_index];
+			vec3f ab = nearest_model->data.vertices[face_v->vertex_indices[0]] - nearest_model->data.vertices[face_v->vertex_indices[1]];
+			vec3f ac = nearest_model->data.vertices[face_v->vertex_indices[0]] - nearest_model->data.vertices[face_v->vertex_indices[2]];
 			intersection_data.normal = cross(ab, ac);
 		}
 		//TODO: set the material for 
-		intersection_data.hit_material = intersection_data.tid.model->data.material;
+		intersection_data.hit_material = nearest_model->data.material;
 	}
 	else
 	{
 		//Hits nothing but Skybox
+		//TODO: proper skybox intersection. Maybe cube map
 		intersection_data.hit_material = &scene.materials[0];	//material 0 is skybox
 		intersection_data.type = ObjectType::SKYBOX;
 	}
-	intersection_data.distance_at_intersection = closest;
 	normalize(intersection_data.normal);
 
 	return;
@@ -199,7 +210,7 @@ void get_intersection_data(Ray& casted_ray, Scene& scene, IntersectionData& inte
 
 
 //returns color from casting ray into scene
-static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RNG_Stream *rng_stream)
+static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_casts, RayCastTools& tools )
 {
 	int i;
 	vec3f return_color = { 0,0,0 };
@@ -211,7 +222,7 @@ static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_cas
 	for (i = 0; i < bounce_limit; i++)
 	{
 		
-		get_intersection_data(casted_ray, scene, id);
+		get_intersection_data(casted_ray, scene, id, tools);
 
 		if (id.type == ObjectType::SKYBOX)
 		{
@@ -232,7 +243,7 @@ static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_cas
 		normalize(pure_bounce);
 			
 		//random ray
-		vec3f random_bounce = {rand_bi(rng_stream), rand_bi(rng_stream), rand_bi(rng_stream)};
+		vec3f random_bounce = {rand_bi(tools.rng_stream), rand_bi(tools.rng_stream), rand_bi(tools.rng_stream)};
 		random_bounce += id.normal;
 		normalize(random_bounce);
 
@@ -250,27 +261,37 @@ static vec3f cast_ray(Ray& ray, Scene& scene, int32 bounce_limit, int64& ray_cas
 	return  return_color;
 }
 
-void prep_scene(Scene scene)
+void prep_scene(Scene &scene, uint32& kd_tree_max_nodes)
 {
+	kd_tree_max_nodes = 0;
 	for (int32 i = 0; i < scene.planes.length; i++)
 	{
 		normalize(scene.planes[i].normal);
 	}
-
-	/*for (int32 i = 0; i < scene.no_of_models; i++)
+	for (int32 i = 0; i < scene.models.length; i++)
 	{
-		for (int32 j = 0; j < scene.models[i].no_of_triangles; j++)
+#if defined USE_KD_TREE
+		if (scene.models[i].kd_tree.tree.front == 0)
 		{
-			vec3f ab = scene.models[i].triangles[j].a - scene.models[i].triangles[j].b;
-			vec3f ac = scene.models[i].triangles[j].a - scene.models[i].triangles[j].c;
-			scene.triangles[i].normal = cross(ab, ac);
-			normalize(scene.triangles[i].normal);
+			build_KD_tree(scene.models[i].data, scene.models[i].kd_tree);
+			if (scene.models[i].data.normals.size > 0)
+			{
+				scene.models[i].data.faces_vertices.clear();
+				scene.models[i].data.vertices.clear();
+			}
 		}
-	}*/
+		if (scene.models[i].kd_tree.tree.length > (int32)kd_tree_max_nodes)
+		{
+			kd_tree_max_nodes = scene.models[i].kd_tree.tree.length;
+		}
+#else
+
+#endif
+	}
 }
 
 ATP_REGISTER_M(Tiles, 0);
-static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
+static b32 render_tile_from_camera(RenderInfo& info, RayCastTools& tools)
 {
 	RenderTile* rt;
 	Tile* tile_;
@@ -298,6 +319,14 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 
 		for (int32 x = tile_->left_bottom.x; x <= tile_->right_top.x; x++)
 		{
+			/*if (x == 645 && y == 452)	//to debug a single pixel
+			{
+				__debugbreak();
+			}
+			else
+			{
+				continue;
+			}*/
 			f32 film_x = (-1.0f + 2.0f * ((f32)x / (f32)info.camera->render_settings.resolution.x)) * info.camera->h_fov * info.camera->aspect_ratio;
 
 			vec3b pixel_color;
@@ -309,12 +338,12 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 			{
 				for (uint32 i = 0; i < info.camera->render_settings.samples_per_pixel; i++)
 				{
-					f32 x_off = rand_bi(rng_stream) * info.camera->half_pixel_width + film_x;
-					f32 y_off = rand_bi(rng_stream) * info.camera->half_pixel_height + film_y;
+					f32 x_off = rand_bi(tools.rng_stream) * info.camera->half_pixel_width + film_x;
+					f32 y_off = rand_bi(tools.rng_stream) * info.camera->half_pixel_height + film_y;
 					pixel_pos = info.camera->frame_center + (info.camera->camera_x * x_off) + (info.camera->camera_y * y_off);
 					SetRay(ray, info.camera->eye, pixel_pos);
 
-					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, rt->ray_casts, rng_stream);
+					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, rt->ray_casts, tools);
 				}
 			}
 			else
@@ -324,7 +353,7 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 
 				for (uint32 i = 0; i < info.camera->render_settings.samples_per_pixel; i++)
 				{
-					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, rt->ray_casts, rng_stream);
+					flt_pixel_color += cast_ray(ray, *info.scene, info.camera->render_settings.bounce_limit, rt->ray_casts, tools);
 				}
 			}
 			flt_pixel_color = flt_pixel_color / (f32)info.camera->render_settings.samples_per_pixel;
@@ -343,11 +372,31 @@ static b32 render_tile_from_camera(RenderInfo& info, RNG_Stream* rng_stream)
 static void start_tile_render_thread(void* data)
 {
 	RenderInfo* info = (RenderInfo*)data;
-	RNG_Stream rng_stream;
-	rng_stream.state = get_hardware_entropy();
-	rng_stream.stream = (uint64)get_thread_id();
+	
 
-	while (render_tile_from_camera(*info, &rng_stream));
+	RNG_Stream rng_stream;
+	rng_stream.state = pl_get_hardware_entropy();
+	rng_stream.stream = (uint64)pl_get_thread_id();
+
+	DBuffer<KD_Node*> hit_stack;	//a list of non-leaf nodes the ray hits and needs to traverse for KD traversal
+	DBuffer<LeafNodePair> leaf_stack;	//a list of leaf nodes the ray hits for KD traversal
+	hit_stack.capacity = info->hit_stack_capacity;
+	leaf_stack.capacity = info->leaf_stack_capacity;
+	hit_stack.front = (KD_Node**)pl_buffer_alloc(hit_stack.capacity * sizeof(KD_Node*));
+	leaf_stack.front = (LeafNodePair*)pl_buffer_alloc(leaf_stack.capacity + 1 * sizeof(LeafNodePair));
+	*leaf_stack.front = { 0,-MAX_FLOAT };	//used as barrier in KD_traversal
+	leaf_stack.front++;
+
+	RayCastTools tools;
+	tools.rng_stream = &rng_stream;
+	tools.leaf_stack = &leaf_stack;
+	tools.hit_stack = &hit_stack;
+	
+	while (render_tile_from_camera(*info, tools));
+
+	leaf_stack.front--;
+	leaf_stack.clear_buffer();
+	hit_stack.clear_buffer();
 }
 
 
@@ -357,6 +406,10 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 	
 	//Creates a WorkQueue made of RenderTiles
 	int32 tile_width = info.camera_tex->bmb.width / tpool.threads.size;	//ASSESS: which tile_width value gives best results
+	if (tile_width > (int32)info.camera_tex->bmb.height)
+	{
+		tile_width = info.camera_tex->bmb.height / tpool.threads.size;
+	}
 	int32 tile_height = tile_width;	// for square tiles
 
 	ASSERT(tile_width > 0 && tile_height > 0 && tile_height <= (int32)info.camera_tex->bmb.height);
@@ -396,7 +449,7 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 	//----for ATP profiling----
 	ATP_GET_TESTTYPE(Tiles)->tests.size = info.twq.jobs.size;
 	ATP_GET_TESTTYPE(Tiles)->tests.finished_tests = 0;
-	ATP_GET_TESTTYPE(Tiles)->tests.front = (ATP::TestInfo*)buffer_calloc(ATP_GET_TESTTYPE(Tiles)->tests.size * sizeof(ATP::TestInfo));
+	ATP_GET_TESTTYPE(Tiles)->tests.front = (ATP::TestInfo*)pl_buffer_alloc(ATP_GET_TESTTYPE(Tiles)->tests.size * sizeof(ATP::TestInfo));
 
 
 	activate_pool(tpool, start_tile_render_thread, &info);
@@ -405,14 +458,12 @@ void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 
 b32 wait_for_render_from_camera_to_finish(RenderInfo& info,ThreadPool& tpool, uint32 ms_to_wait_for)
 {
-	if (wait_for_all_threads(tpool.threads.size, &tpool.threads[0].handle, ms_to_wait_for))
+	if (pl_wait_for_all_threads(tpool.threads.size, &tpool.threads[0].handle, ms_to_wait_for))
 	{
 		return TRUE;
 	}
 	else
 	{
-		close_threads(tpool.threads.size, &tpool.threads[0].handle);
-
 		for (int i = 0; i < info.twq.jobs.size; i++)
 		{
 			info.total_ray_casts += info.twq.jobs[i].ray_casts;
