@@ -628,7 +628,137 @@ static void traverse_quad_tree(TraversalData& td, KD_Node* current_node)
 	}
 }
 
-static void traverse_oct_tree(TraversalData& td, KD_Node* current_node)
+
+
+static void traverse_oct_tree_new(TraversalData& td, KD_Tree& tree,KD_Node** hit_stack_front,LeafNodePair* leaf_stack_front)
+{
+	if (!check_ray_AABB_intersection(*td.ray, tree.tree.front->aabb))
+	{
+		return;
+	}
+
+	if (tree.tree.front->has_children == 0)	//if there is no nodes other than root
+	{
+		KD_Primitive* prim = tree.tree.front->primitives.front;
+		for (uint32 i = 0; i < tree.tree.front->primitives.size; i++)
+		{
+			f32 u, v;
+			f32 distance = get_triangle_ray_intersection_culled(td.ray->ray, prim->face_vertices, u, v);
+			if (distance < *td.closest && distance > tolerance)
+			{
+				*td.closest = distance;
+				td.tri_data->face_index = tree.tree.front->primitives[i].face_index;
+				td.tri_data->u = u;
+				td.tri_data->v = v;
+			}
+			prim++;
+		}
+		return;
+	}
+	
+	int32 leaf_stack_length = 0;
+	*hit_stack_front = tree.tree.front;
+	int32 hit_stack_length = 1;
+
+
+	while (hit_stack_length > 0)
+	{
+		KD_Node* cur = *(hit_stack_front + hit_stack_length - 1);
+		hit_stack_length--;
+		KD_Node* children = tree.tree.front + cur->children_start_position;
+		int nodes_hit = 0;	//ASSESS: whether this is actually a significant optimization or not. A ray cant hit more than 4 child nodes.
+		for (int i = 0; i < 8 && nodes_hit <= 4; i++)
+		{
+			if (children->has_children)
+			{
+				if (check_ray_AABB_intersection(*td.ray, children->aabb))
+				{
+					nodes_hit++;
+					*(hit_stack_front + hit_stack_length) = children;
+					hit_stack_length++;
+				}
+			}
+			else
+			{
+				f32 dis = get_ray_AABB_intersection(*td.ray, children->aabb);
+				if (dis > 0.0f)
+				{
+					nodes_hit++;
+					//inserting into leaf_stack in ascending manner
+					if (leaf_stack_length == 0)
+					{
+						*leaf_stack_front = { children,dis };
+						leaf_stack_length++;
+					}
+					else
+					{
+						
+						//NOTE:if new element is less than first in list (lower than all elements), 
+						//the barrier element before leaf_stack.front will stop the while and will add the new element at the beginning.
+						LeafNodePair* end = leaf_stack_front + leaf_stack_length - 1;
+						while (dis < end->distance_from_ray)
+						{
+							*(end + 1) = *end;
+							end--;
+						}
+						*(end + 1) = { children,dis };
+						leaf_stack_length++;
+						
+					}
+					
+				}
+				/*if (check_ray_AABB_intersection(*td.ray, children->aabb))
+				{
+					nodes_hit++;
+					KD_Primitive* prim = children->primitives.front;
+					for (uint32 i = 0; i < children->primitives.size; i++)
+					{
+						f32 u, v;
+						f32 distance = get_triangle_ray_intersection_culled(td.ray->ray, prim->face_vertices, u, v);
+						if (distance < *td.closest && distance > tolerance)
+						{
+							*td.closest = distance;
+							td.tri_data->face_index = children->primitives[i].face_index;
+							td.tri_data->u = u;
+							td.tri_data->v = v;
+						}
+						prim++;
+					}
+				}*/
+			}
+			children++;
+		}
+	}
+
+	//start checking for primitive interesections from beginning of sorted list of leaf_stack
+	LeafNodePair* cur = leaf_stack_front;
+	b32 hit = FALSE;
+	for (int j = 0; j < leaf_stack_length; j++)
+	{
+		KD_Primitive* prim = cur->node->primitives.front;
+		for (uint32 i = 0; i < cur->node->primitives.size; i++)
+		{
+			f32 u, v;
+			f32 distance = get_triangle_ray_intersection_culled(td.ray->ray, prim->face_vertices, u, v);
+			if (distance < *td.closest && distance > tolerance)
+			{
+				*td.closest = distance;
+				td.tri_data->face_index = cur->node->primitives[i].face_index;
+				td.tri_data->u = u;
+				td.tri_data->v = v;
+				hit = TRUE;
+			}
+			prim++;
+		}
+		if (hit)
+		{
+			break;
+		}
+		cur++;
+	}
+}
+
+static void traverse_oct_tree_recursive(TraversalData& td, KD_Node* current_node)
 {
 	if (!get_ray_AABB_intersection(*td.ray, current_node->aabb))
 	{
@@ -636,14 +766,14 @@ static void traverse_oct_tree(TraversalData& td, KD_Node* current_node)
 	}
 	if (current_node->has_children)
 	{
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position]);	//bleft node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 1]);	//bright node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 2]);	//tleft node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 3]);	//tright node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 4]);	//bleft node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 5]);	//bright node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 6]);	//tleft node
-		traverse_oct_tree(td, &td.tree->tree[current_node->children_start_position + 7]);	//tright node
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 1]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 2]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 3]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 4]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 5]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 6]);	
+		traverse_oct_tree_recursive(td, &td.tree->tree[current_node->children_start_position + 7]);	
 	}
 	else   //is leaf node
 	{
@@ -663,7 +793,9 @@ static void traverse_oct_tree(TraversalData& td, KD_Node* current_node)
 		}
 	}
 }
-f32 get_ray_kd_tree_intersection(Optimized_Ray &op_ray, KD_Tree& tree, TriangleIntersectionData& tri_data)
+
+
+f32 get_ray_kd_tree_intersection(Optimized_Ray &op_ray, KD_Tree& tree, TriangleIntersectionData& tri_data, KD_Node** hit_stack_front, LeafNodePair* leaf_stack_front)
 {
 	f32 closest = MAX_FLOAT;
 
@@ -672,22 +804,22 @@ f32 get_ray_kd_tree_intersection(Optimized_Ray &op_ray, KD_Tree& tree, TriangleI
 	td.ray = &op_ray;
 	td.tri_data = &tri_data;
 	td.tree = &tree;
-
 	switch (tree.max_divisions)
 	{
 		case KD_Divisions::TWO:
 		{
-			traverse_binary_tree(td, td.tree->tree.front);
+			traverse_binary_tree(td, tree.tree.front);
 			return closest;
 		}break;
 		case KD_Divisions::FOUR:
 		{
-			traverse_quad_tree(td, td.tree->tree.front);
+			traverse_quad_tree(td, tree.tree.front);
 			return closest;
 		}break;
 		case KD_Divisions::EIGHT:
 		{
-			traverse_oct_tree(td, td.tree->tree.front);
+			traverse_oct_tree_new(td, tree, hit_stack_front, leaf_stack_front);
+			//traverse_oct_tree_recursive(td, tree.tree.front);
 			return closest;
 		}break;
 		default:

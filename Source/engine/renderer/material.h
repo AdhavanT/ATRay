@@ -1,7 +1,6 @@
 #pragma once
 #include "PL/PL_math.h"
 
-
 struct Material
 {
 	vec3f emission_color;

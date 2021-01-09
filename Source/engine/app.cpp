@@ -1,45 +1,8 @@
 #include "PL/pl.h"
+#include "engine/tools/texture.h"
 #include "renderer/renderer.h"
-#include "utilities/texture.h"
 #include "utilities/ATP/atp.h"
 #include "engine/tools/OBJ_loader.h"
-
-//TODO:
-//Bugs:
-//1.memory allocation fails when trying to build tree with low no of faces per node.Implement memory arena or something.
-//2.Tree unable to add triangles that are bigger(all 3 vertices outside node) than node aabb but are still inside.must find another way to detect if triangle is inside node.
-
-//TODO: remove this. This is for debug purposes. 
-static Model make_model_from_aabb(AABB box)
-{
-	Model mdl = {};
-	int32 no_faces = 6 * 2;
-	int32 no_vertices = 8;
-	mdl.data.faces_vertices.allocate(no_faces);
-	mdl.data.vertices.allocate(no_vertices);
-	mdl.data.vertices[0] = box.min;
-	mdl.data.vertices[1] = { box.max.x, box.min.y,box.min.z };
-	mdl.data.vertices[2] = { box.min.x, box.max.y,box.min.z };
-	mdl.data.vertices[3] = { box.max.x, box.max.y,box.min.z };
-	mdl.data.vertices[4] = { box.min.x, box.min.y,box.max.z };
-	mdl.data.vertices[5] = { box.max.x, box.min.y,box.max.z };
-	mdl.data.vertices[6] = { box.min.x, box.max.y,box.max.z };
-	mdl.data.vertices[7] = box.max;
-
-	mdl.data.faces_vertices[0] = { 0,1,3 };
-	mdl.data.faces_vertices[1] = { 0,3,2 };
-	mdl.data.faces_vertices[2] = { 1,5,4 };
-	mdl.data.faces_vertices[3] = { 1,4,0 };
-	mdl.data.faces_vertices[4] = { 2,6,4 };
-	mdl.data.faces_vertices[5] = { 2,4,0 };
-	mdl.data.faces_vertices[6] = { 3,6,2 };
-	mdl.data.faces_vertices[7] = { 3,7,6 };
-	mdl.data.faces_vertices[8] = { 4,5,7 };
-	mdl.data.faces_vertices[9] = { 4,7,6 };
-	mdl.data.faces_vertices[10] = { 5,7,3 };
-	mdl.data.faces_vertices[11] = { 5,3,1 };
-	return mdl;
-}
 
 ATP_REGISTER(load_assets);
 ATP_REGISTER(prep_scene);
@@ -52,7 +15,7 @@ void PL_entry_point(PL& pl)
 	pl.running = TRUE;
 	pl.core_count = 8;
 	Texture texture;
-	Setup_Texture(texture, TextureFileType::BMP, 1280, 720);
+	Setup_Texture(texture, TextureFileType::BMP, 1920, 1080);
 
 	pl.window.height = texture.bmb.height;
 	pl.window.width = texture.bmb.width;
@@ -92,30 +55,26 @@ static int32 find_tile_index_covering_point(vec2i point, WorkQueue<RenderTile>& 
 	return -1;
 }
 
-ATP_REGISTER(build_KD_tree);
-
 static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 {
 
 	ATP_START(load_assets);
 
 	pl_debug_print("\nLoading Assets...\n");
-	Model monkey = {};
-	load_model_data(monkey.data, "Assets\\Dragon.obj", tpool);
-	monkey.surrounding_aabb = get_AABB(monkey.data);
-	//resize_scale(monkey, 3);
-	translate_to(monkey, { 0.f,-15.f,-38.f });
+	Model model = {};
+	load_model_data(model.data, "Assets\\dragon.obj", tpool);
+	model.surrounding_aabb = get_AABB(model.data);
+	//resize_scale(model, 3);
+	vec3f center = (model.surrounding_aabb.max - model.surrounding_aabb.min) / 2 + model.surrounding_aabb.min;
 
-	//Model monkey_aabb = make_model_from_aabb(monkey_scale);
+
+
+	translate_to(model, { 0.f,-15.f,-38.f });
 	ATP_END(load_assets);
 
-	ATP_START(build_KD_tree);
-	monkey.kd_tree.max_divisions = KD_Divisions::FOUR;
-	monkey.kd_tree.division_method = KD_Division_Method::SAH;
-	monkey.kd_tree.max_no_faces_per_node = (uint32)((200.f/(1570.f * 8)) * (f32)monkey.data.faces_vertices.size);	//use "bucket size" or density value factor to calculate this.
-	build_KD_tree(monkey.data, monkey.kd_tree);
-	ATP_END(build_KD_tree);
-	//monkey.data.faces_vertices.clear();
+	model.kd_tree.max_divisions = KD_Divisions::EIGHT;
+	model.kd_tree.division_method = KD_Division_Method::SAH;
+	model.kd_tree.max_no_faces_per_node = 300;//(uint32)((200.f/(1570.f * 8)) * (f32)model.data.faces_vertices.size);	//use "bucket size" or density value factor to calculate this.
 
 	Camera cm;
 	RenderSettings rs;
@@ -135,7 +94,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	Material sphere_2 = { {0.0f,0.0f,0.0f }, {0.4f,0.8f,0.9f },0.9f };
 	Material plane_2 = { { 0.0f, 0.4f,0.6f } , { 0.2f, 0.3f,0.2f },0.f };
 	Material ground_plane = { {0.f, 0.f,0.0f } , {0.5f, 0.5f,0.5f },0.f };
-	Material model = { {0.4f,0.2f,0.2f}, {0.92f,0.5f,0.0f},0.3f };
+	Material model_mat = { {0.4f,0.2f,0.2f}, {0.92f,0.5f,0.0f},0.3f };
 	Material mat_model_aabb = { {0.8f,0.2f,0.2f}, {0.92f,0.0f,0.0f},0.3f };
 
 	scene.materials.add(skybox);	//The first material is the skybox
@@ -143,7 +102,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	scene.materials.add(sphere_2);
 	scene.materials.add(plane_2);
 	scene.materials.add(ground_plane);
-	scene.materials.add(model);
+	scene.materials.add(model_mat);
 	scene.materials.add(mat_model_aabb);
 
 	//NOTE: this stuff is ad-hoc right now and should be properly implemented. 
@@ -170,23 +129,22 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	pln[1].normal = { 0.f,1.f,0.f };
 	pln[1].material = &scene.materials[4];
 
-	monkey.data.material = &scene.materials[5];
-	//monkey_aabb.data.material = &scene.materials[6];
+	model.data.material = &scene.materials[5];
 
 	AABB tmp = {};
 	tmp.min = { -0.5f,-0.5f,-3.5f };
 	tmp.max = { 0.5f,4.5f,-2.5f };
 
 	
-	//scene.models.add_nocpy(monkey_aabb);
-	scene.models.add_nocpy(monkey);
+	scene.models.add_nocpy(model);
 	//scene.planes.add(pln[0]);
 	//scene.planes.add(pln[1]);
 	//scene.spheres.add(spr[0]);
 	//scene.spheres.add(spr[1]);
 
+	uint32 kd_tree_max_nodes;
 	ATP_START(prep_scene);
-	prep_scene(scene);
+	prep_scene(scene, kd_tree_max_nodes);
 	ATP_END(prep_scene);
 
 	pl_debug_print("\nResolution [%i,%i] || Samples per pixel - %i - Starting Render...\n",texture.bmb.width, texture.bmb.height, rs.samples_per_pixel);
@@ -195,6 +153,8 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	info.camera_tex = &texture;
 	info.camera = &cm;
 	info.scene = &scene;
+	info.hit_stack_capacity = kd_tree_max_nodes;
+	info.leaf_stack_capacity = kd_tree_max_nodes;
 
 	ATP_START(render_from_camera);
 	start_render_from_camera(info, tpool);
@@ -215,7 +175,7 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 		if (info.twq.jobs_done > last_tile)
 		{
 			char buffer[512];
-			pl_format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width, pl.window.height, pl.core_count, info.twq.jobs_done, info.twq.jobs.size);
+			pl_format_print(buffer, 512, "Rendering: Width:%i, Height:%i | Threads: %i | Tiles: %i/%i", pl.window.width, pl.window.height, tpool.threads.size, info.twq.jobs_done, info.twq.jobs.size);
 			pl.window.title = buffer;
 			PL_push_window(pl.window, TRUE);
 			last_tile = info.twq.jobs_done;

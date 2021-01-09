@@ -277,10 +277,18 @@ static inline void clear_OBJ_Model_Load_Chunk_Data(OBJ_Model_Load_Chunk_Data& da
 
 void load_model_data(ModelData& mdl, const char* file_name, ThreadPool& threadpool)
 {
-
-	uint32 file_size = pl_get_file_size((char*)file_name);
+	void* file;
+	if (!pl_get_file_handle((char*)file_name, &file))
+	{
+		ASSERT(FALSE);	//file doesn't exist or couldn't load file
+	}
+	uint32 file_size = (uint32)pl_get_file_size(file);
 	char* buffer_front = (char*)pl_buffer_alloc(file_size + 1);
-	pl_load_file_into(buffer_front, file_size, (char*)file_name);
+	if (!pl_load_file_into(file, buffer_front, file_size))
+	{
+		ASSERT(FALSE);	//couldn't load entire file
+	}
+	pl_close_file_handle(file);
 
 	if (buffer_front[file_size - 1] != 0)
 	{

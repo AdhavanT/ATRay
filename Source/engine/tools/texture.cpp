@@ -1,7 +1,7 @@
 #include "texture.h"
 #include "PL/pl_utils.h"
 
-static uint32 strlen(char* str) 
+static inline uint32 strlen(char* str) 
 {
 	uint32 len = 0;
 	while (*str != 0) 
@@ -90,14 +90,12 @@ namespace BMP_FILE_FORMAT
 		bmp.bfh.reserved2 = 0;
 		bmp.bfh.total_file_size = 14 + sizeof(bmp.bih) + bmp.bitmap_buffer.size();
 
-		//TODO: change to use PL file io instead of std library
 		void* file = 0;
 
 		uint32 file_id = 0;
 		int length = strlen((char*)file_name);
 
-		char* new_name = (char*)pl_buffer_alloc(length + 8);
-
+		char new_name[1024];
 		pl_format_print(new_name, length + 8, "%s%c%u%s", file_name, '_', file_id, ".bmp");
 
 		//Checking if another file exists with same name
@@ -113,7 +111,6 @@ namespace BMP_FILE_FORMAT
 			pl_append_to_file(file, bmp.bitmap_buffer.buffer_memory, bmp.bitmap_buffer.size());
 			pl_close_file_handle(file);
 		}
-		pl_buffer_free(new_name);
 		return true;
 	}
 

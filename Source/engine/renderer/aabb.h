@@ -26,16 +26,10 @@ static inline b8 is_inside(vec3f point, AABB box)
 	return(x_check && y_check && z_check);
 }
 
-
-static inline b32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
+static inline f32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
 {
-	/*if (is_inside(r.ray.origin, bb))
-	{
-		return true;
-	}*/
-
 	//optimized version 
-	float tmin, tmax, tymin, tymax, tzmin, tzmax;
+	f32 tmin, tmax, tymin, tymax, tzmin, tzmax;
 
 	tmin = (bb.bounds[r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
 	tmax = (bb.bounds[1 - r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
@@ -43,7 +37,7 @@ static inline b32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
 	tymax = (bb.bounds[1 - r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
 
 	if ((tmin > tymax) || (tymin > tmax))
-		return false;
+		return 0;
 	if (tymin > tmin)
 		tmin = tymin;
 	if (tymax < tmax)
@@ -53,13 +47,49 @@ static inline b32 get_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
 	tzmax = (bb.bounds[1 - r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
 
 	if ((tmin > tzmax) || (tzmin > tmax))
-		return false;
+		return 0;
 	if (tzmin > tmin)
 		tmin = tzmin;
 	if (tzmax < tmax)
 		tmax = tzmax;
+	if(tmin > 0)
+	return tmin;
+	else if(tmax > 0)
+	{
+		return tmax;
+	}
+	return 0;
 
-	return true;
+}
+
+static inline b32 check_ray_AABB_intersection(Optimized_Ray& r, AABB& bb)
+{
+	//optimized version 
+	float tmin, tmax, tymin, tymax, tzmin, tzmax;
+
+	tmin = (bb.bounds[r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tmax = (bb.bounds[1 - r.inv_signs[0]].x - r.ray.origin.x) * r.inv_ray_d.x;
+	tymin = (bb.bounds[r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
+	tymax = (bb.bounds[1 - r.inv_signs[1]].y - r.ray.origin.y) * r.inv_ray_d.y;
+
+	if ((tmin > tymax) || (tymin > tmax))
+		return FALSE;
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
+
+	tzmin = (bb.bounds[r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
+	tzmax = (bb.bounds[1 - r.inv_signs[2]].z - r.ray.origin.z) * r.inv_ray_d.z;
+
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return FALSE;/*
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;*/
+
+	return TRUE;
 
 	//better to understand what is going on
 	/*float tmin = (bb.min.x - r.ray.origin.x) * r.inv_ray_d.x;

@@ -114,8 +114,16 @@ struct DBuffer
 	//Clears memory and resets length.
 	FORCEDINLINE void clear_buffer()
 	{
-		length = 0;
-		pl_buffer_free(front);
+		if (front != 0)
+		{
+			pl_buffer_free(front);
+			front = 0;
+			length = 0;
+		}
+		//else
+		//{
+		//	ASSERT(FALSE);	//trying to free freed memory
+		//}
 	}
 
 	FORCEDINLINE t& operator [](size_type index)
@@ -155,8 +163,16 @@ struct FDBuffer
 	//clears size and deallocates memory 
 	FORCEDINLINE void clear()
 	{
-		size = 0;
-		pl_buffer_free(front);
+		if (front != 0)
+		{
+			pl_buffer_free(front);
+			front = 0;
+			size = 0;
+		}
+		//else
+		//{
+		//	ASSERT(FALSE);	//trying to free freed memory
+		//}
 	}
 	FORCEDINLINE t& operator [](size_type index)
 	{
@@ -510,14 +526,11 @@ FORCEDINLINE f32 mag(vec3f vector)
 	return { sqroot(mag2(vector)) };
 }
 
-FORCEDINLINE b32 normalize(vec3f& v)
+FORCEDINLINE void normalize(vec3f& v)
 {
-	if (mag2(v) == 1.0f)
-	{
-		return false;
-	}
-	v = v / mag(v);
-	return true;
+	f32 inv_sqr_root = mag2(v);
+	inv_sqr_root = _mm_cvtss_f32(_mm_invsqrt_ps(_mm_set_ss(inv_sqr_root)));
+	v = v * inv_sqr_root;
 }
 //----</Vec3>----
 
@@ -532,14 +545,11 @@ FORCEDINLINE f32 mag(vec4f vector)
 	return { sqroot(mag2(vector)) };
 }
 
-FORCEDINLINE b32 normalize(vec4f& v)
+FORCEDINLINE void normalize(vec4f& v)
 {
-	if (mag2(v) == 1.0f)
-	{
-		return false;
-	}
-	v = v / mag(v);
-	return true;
+	f32 inv_sqr_root = mag2(v);
+	inv_sqr_root = _mm_cvtss_f32(_mm_invsqrt_ps(_mm_set_ss(inv_sqr_root)));
+	v = v * inv_sqr_root;
 }
 //----</Vec4>----
 

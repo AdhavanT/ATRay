@@ -120,6 +120,19 @@ inline void resize_scale(Model& mdl ,f32 new_max_scale)
 	bounding_box.min = bounding_box.min * rescale_factor;
 }
 
+struct Bases
+{
+	vec3f origin;
+	vec3f x_axis;
+	vec3f y_axis;
+};
+
+inline void transform(Model& mdl, vec3f axis, f32 radian)
+{
+
+}
+
+
 inline void translate_to(Model& mdl, vec3f new_center)
 {
 	AABB& aabb = mdl.surrounding_aabb;

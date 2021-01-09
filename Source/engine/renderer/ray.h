@@ -20,7 +20,7 @@ struct Optimized_Ray
 	vec3i inv_signs;
 };
 
-static inline void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
+FORCEDINLINE void SetRay(Ray &ray,vec3f origin_, vec3f towards_)
 {
 	ray.origin = origin_;
 	ray.direction = towards_ - origin_;
