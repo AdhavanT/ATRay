@@ -1,8 +1,7 @@
 #pragma once
 
 //-----------------------------------------------
-#include "PL_base_defs.h"
-#include "pl_config.h"
+#include "pl_base_defs.h"
 struct PL;
 typedef void(*PL_Function)(PL& pl);	//used for functions that are different for different modes. Ex: PL_push_window() is different for opengl and for bit-blitting using a bitmap. 
 
@@ -16,6 +15,11 @@ struct PL_Audio_Input;
 struct PL_Audio_Output;
 
 //-----------------------------------------------------</functionality>---------------------------------------------
+//-----------------------------------------------------<Memory>----------------------------------------------------
+#define PL_MEMORY_ARENA_DEF_ONLY
+#include "pl_memory_arena.h"
+#undef PL_MEMORY_ARENA_DEF_ONLY
+//-----------------------------------------------------</Memory>----------------------------------------------------
 
 
 //-----------------------------------------------------<Window>-----------------------------------------------------
@@ -43,10 +47,13 @@ struct PL_Window
 	uint32 width;
 	char* title;
 };
-void PL_poll_window(PL_Window & pl);
-void PL_push_window(PL_Window & pl, b32 refresh_window_title);
-void PL_initialize_window(PL_Window & pl);
-void PL_cleanup_window(PL_Window & pl);
+void PL_poll_window(PL_Window& pl);
+void PL_push_window(PL_Window& pl, b32 refresh_window_title);
+void PL_initialize_window(PL_Window& pl);
+void PL_initialize_window(PL_Window& window, MArena* arena);
+void PL_cleanup_window(PL_Window& pl);
+void PL_cleanup_window(PL_Window& window, MArena* arena);
+
 //-----------------------------------------------------</Window>----------------------------------------------------
 
 //-----------------------------------------------------<Timing>-----------------------------------------------------
@@ -54,7 +61,7 @@ void PL_cleanup_window(PL_Window & pl);
 struct PL_Timing
 {
 	uint64 cycles_per_second;
-	
+
 	uint64 current_cycles;
 	uint64 current_micros;
 	uint64 current_millis;
@@ -117,7 +124,7 @@ struct PL_Input_Gamepad
 
 	PL_Analog_Button left_trigger;
 	PL_Analog_Button right_trigger;
-	
+
 	PL_Analog_Stick left_stick;
 	PL_Analog_Stick right_stick;
 
@@ -139,18 +146,18 @@ void PL_poll_input_mouse(PL_Input_Mouse& pl, PL_Window& main_window);
 enum PL_KEY
 {
 
-	NUM_0 = 48,NUM_1,NUM_2,
-	NUM_3,NUM_4,NUM_5,
-	NUM_6,NUM_7,NUM_8,NUM_9,
+	NUM_0 = 48, NUM_1, NUM_2,
+	NUM_3, NUM_4, NUM_5,
+	NUM_6, NUM_7, NUM_8, NUM_9,
 
-	A = 65,B,C,D,E,
-	F,G,H,I,J,K,L,
-	M,N,O,P,Q,R,S,
-	T,U,V,W,X,Y,Z,
+	A = 65, B, C, D, E,
+	F, G, H, I, J, K, L,
+	M, N, O, P, Q, R, S,
+	T, U, V, W, X, Y, Z,
 
-	F1 = 112,F2,F3,F4,
-	F5,F6,F7,F8,
-	F9,F10,F11,F12,
+	F1 = 112, F2, F3, F4,
+	F5, F6, F7, F8,
+	F9, F10, F11, F12,
 
 	ESCAPE = 27,
 
@@ -179,11 +186,11 @@ struct PL_Audio_Format
 {
 	uint32 no_channels;
 	uint32 no_bits_per_sample;
-	uint32 samples_per_second;				
+	uint32 samples_per_second;
 	uint32 buffer_frame_count;			    //The amount of frames (frames = sample size * no of channels) in the buffer. If this is 0, time will be used to calculate and create buffer
 	f32 buffer_duration_seconds;			//If this is 0, buffer_sample_size is used. if both are zero, this is 1.0(1 second).
 };
- 
+
 struct PL_Audio_Output
 {
 	PL_Audio_Format format;
@@ -201,11 +208,12 @@ struct PL_Audio_Input
 	PL_Audio_Format format;
 };
 void PL_initialize_audio_capture(PL_Audio_Input& pl);
+void PL_initialize_audio_capture(PL_Audio_Input& pl, MArena* arena);
 void PL_poll_audio_capture(PL_Audio_Input& pl);		//for audio capture
 void PL_cleanup_audio_capture(PL_Audio_Input& pl);
+void PL_cleanup_audio_capture(PL_Audio_Input& input, MArena* arena);
 
 //-----------------------------------------------------</Audio>----------------------------------------------------
-
 
 
 struct PL_Input
@@ -226,6 +234,12 @@ struct PL_Audio
 	PL_Audio_Output output;
 };
 
+struct PL_Memory
+{
+	MArena permanent_storage;
+	MArena temp_storage;
+};
+
 struct PL
 {
 	uint32 core_count;
@@ -235,10 +249,7 @@ struct PL
 	PL_Timing time;
 	PL_Audio audio;
 	PL_Window window;
-	void* general_memory;
+	PL_Memory memory;
 };
 
 void PL_entry_point(PL& pl);
-
-#define PL_CONFIG_UNDEF
-#include"pl_config.h"
