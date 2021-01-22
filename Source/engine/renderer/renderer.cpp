@@ -310,7 +310,6 @@ static b32 render_tile_from_camera(RenderInfo& info, RayCastTools& tools)
 
 	tile_ = &rt->tile;
 	vec3f pixel_pos;
-	//int64 ray_casts = 0;
 
 	for (int32 y = tile_->left_bottom.y; y <= tile_->right_top.y; y++)
 	{
@@ -403,7 +402,6 @@ static void start_tile_render_thread(void* data)
 //Divides image into tiles and creates multiple threads to finish all tiles. 
 void start_render_from_camera(RenderInfo& info, ThreadPool& tpool)
 {
-	
 	//Creates a WorkQueue made of RenderTiles
 	int32 tile_width = info.camera_tex->bmb.width / tpool.threads.size;	//ASSESS: which tile_width value gives best results
 	if (tile_width > (int32)info.camera_tex->bmb.height)

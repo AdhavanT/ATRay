@@ -72,13 +72,11 @@ static void render_app(PL& pl,Texture& texture, ThreadPool& tpool)
 	translate_to(model, { 0.f,-15.f,-38.f });
 	ATP_END(load_assets);
 
-	model.kd_tree.max_divisions = KD_Divisions::EIGHT;
 	model.kd_tree.division_method = KD_Division_Method::SAH;
 	model.kd_tree.max_no_faces_per_node = 300;//(uint32)((200.f/(1570.f * 8)) * (f32)model.data.faces_vertices.size);	//use "bucket size" or density value factor to calculate this.
 
 	Camera cm;
 	RenderSettings rs;
-	rs.no_of_threads = tpool.threads.size;
 	rs.anti_aliasing = FALSE;
 	rs.resolution.x = texture.bmb.width;
 	rs.resolution.y = texture.bmb.height;

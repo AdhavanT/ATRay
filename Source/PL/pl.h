@@ -236,7 +236,7 @@ struct PL_Audio
 
 struct PL_Memory
 {
-	MArena permanent_storage;
+	MArena perm_storage;
 	MArena temp_storage;
 };
 

@@ -2,13 +2,13 @@
 #include "ray.h"
 
 //This KD tree supports a single model.
-
-enum class KD_Divisions
-{
-	TWO = 2,
-	FOUR = 4,
-	EIGHT = 8
-};
+//
+//enum class KD_Divisions
+//{
+//	TWO = 2,
+//	FOUR = 4,
+//	EIGHT = 8
+//};
 
 enum class KD_Division_Method
 {
@@ -39,8 +39,8 @@ struct KD_Tree
 {
 	//max no of triangles per node
 	uint32 max_no_faces_per_node;
-	//Possible number of subnodes for each node
-	KD_Divisions max_divisions;
+	//Possible number of subnodes for each node (Depracted. Only supports oct-trees)
+	//KD_Divisions max_divisions;
 	//How to decide the subnode division point when building tree
 	KD_Division_Method division_method;
 	DBuffer<KD_Node,1,16,int32> tree;
