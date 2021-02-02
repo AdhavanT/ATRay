@@ -15,10 +15,11 @@ void PL_entry_point(PL& pl)
 	pl.running = TRUE;
 	pl.core_count = 8;
 	Texture texture;
-	Setup_Texture(texture, TextureFileType::BMP, 1920, 1080);
+	Setup_Texture(texture, TextureFileType::BMP, 1280, 720);
 
 	pl.window.height = texture.bmb.height;
 	pl.window.width = texture.bmb.width;
+	pl.window.position_y = 100;
 	pl.window.title = (char*)"Starting Rendering...";
 	pl.window.window_bitmap.buffer = texture.bmb.buffer_memory;
 
