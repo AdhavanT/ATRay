@@ -12,7 +12,7 @@
 ## TODO:
 - SIMD
 - Materials
-- Proper Scene definitions
+- Proper Scene loading and unloading
 
 ## Demo
 ![Demo](Demo/dragon_demo.gif)
