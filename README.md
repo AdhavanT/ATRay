@@ -8,3 +8,7 @@
 - Viewing rendering live,
 - KD-Tree acceleration structure,
 - Multithreading for rendering and model parsing 
+
+## Demo
+![Demo](Demo/dragon_demo.gif)
+(Dragon - 139k faces, 416k verts)
