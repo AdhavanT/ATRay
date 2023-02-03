@@ -5,7 +5,7 @@
  - [ATP](https://github.com/AdhavanT/ATProfiler) - Profiling
 
 ### Features:
-- Viewing rendering live,
+- Live Renderering View,
 - KD-Tree acceleration structure,
 - Multithreading for rendering and model parsing 
 
